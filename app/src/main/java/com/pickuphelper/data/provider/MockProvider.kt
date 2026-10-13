@@ -35,20 +35,13 @@ class MockProvider : PickupProvider {
         return if (sample != null) {
             sample
         } else {
-            // Unknown waybillNo — determine shipper from code or detect from prefix
-            val effectiveShipperCode = shipperCode ?: (ShipperCodeMapper.detect(waybillNo) ?: "UNKNOWN")
-            val shipperName = ShipperCodeMapper.toChineseName(effectiveShipperCode)
+            // Unknown waybillNo — return NOT_FOUND failure so MainViewModel shows error feedback
             PickupResult(
-                parcel = Parcel(
-                    waybillNo = waybillNo.uppercase(),
-                    shipperCode = effectiveShipperCode,
-                    shipperName = shipperName,
-                    status = Status.NO_TRACE,
-                    latestTrace = "暂无物流信息",
-                    createdAt = System.currentTimeMillis(),
-                    updatedAt = System.currentTimeMillis()
-                ),
-                traces = emptyList()
+                parcel = null,
+                failure = Failure(
+                    type = FailureType.INVALID_WAYBILL,
+                    message = "未找到该单号的取件信息，请确认单号是否正确"
+                )
             )
         }
     }
@@ -177,3 +170,4 @@ class MockProvider : PickupProvider {
         )
     }
 }
+

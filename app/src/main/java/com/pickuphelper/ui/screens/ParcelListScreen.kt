@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -25,9 +24,9 @@ import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -37,12 +36,14 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -52,38 +53,55 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.pickuphelper.data.local.ParcelEntity
 import com.pickuphelper.domain.model.Status
-import com.pickuphelper.domain.model.StatusMapper
 import com.pickuphelper.viewmodel.MainViewModel
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
-enum class ListTab { PENDING, IN_TRANSIT, SIGNED }
+data class GroupedParcels(
+    val pending: List<ParcelEntity> = emptyList(),
+    val inTransit: List<ParcelEntity> = emptyList(),
+    val delivered: List<ParcelEntity> = emptyList()
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ParcelListScreen(vm: MainViewModel) {
     val parcels by vm.parcels.collectAsState()
-    val grouped = remember(parcels) { groupParcels(parcels) }
+    val isAdding by vm.isAddingParcel.collectAsState()
+    val addError by vm.addParcelError.collectAsState()
+    val addDialogVisible by vm.addParcelDialogVisible.collectAsState()
+    val addSuccess by vm.addParcelSuccess.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
     var selectedTab by remember { mutableIntStateOf(0) }
-    var showAddDialog by remember { mutableStateOf(false) }
-
+    val grouped = remember(parcels) { groupParcels(parcels) }
+    val tabCounts = listOf(grouped.pending.size, grouped.inTransit.size, grouped.delivered.size)
     val tabs = listOf("待取件", "运输中", "已签收")
-    val tabCounts = listOf(grouped.pending.size, grouped.inTransit.size, grouped.signed.size)
+
+    LaunchedEffect(addError) {
+        addError?.let {
+            snackbarHostState.showSnackbar(it)
+            vm.clearAddParcelError()
+        }
+    }
+
+    LaunchedEffect(addSuccess) {
+        addSuccess?.let {
+            snackbarHostState.showSnackbar(it)
+            vm.clearAddParcelSuccess()
+        }
+    }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = { showAddDialog = true },
+                onClick = { vm.showAddParcelDialog() },
                 containerColor = MaterialTheme.colorScheme.primary
             ) {
-                Icon(Icons.Default.Add, contentDescription = "手动录入")
+                Icon(Icons.Default.Add, contentDescription = "添加包裹")
             }
         }
     ) { padding ->
@@ -92,318 +110,115 @@ fun ParcelListScreen(vm: MainViewModel) {
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            // Segmented tab row
-            SingleChoiceSegmentedButtonRow(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
-            ) {
+            TabRow(selectedTabIndex = selectedTab) {
                 tabs.forEachIndexed { index, title ->
-                    SegmentedButton(
+                    Tab(
                         selected = selectedTab == index,
                         onClick = { selectedTab = index },
-                        shape = SegmentedButtonDefaults.itemShape(index, tabs.size),
-                        label = { Text("$title (${tabCounts[index]})") }
+                        text = { Text("$title (${tabCounts[index]})") }
                     )
                 }
             }
 
-            val displayList = when (selectedTab) {
-                0 -> grouped.pending
-                1 -> grouped.inTransit
-                else -> grouped.signed
-            }
+            val displayParcels = when (selectedTab) { 0 -> grouped.pending; 1 -> grouped.inTransit; else -> grouped.delivered }
 
-            if (displayList.isEmpty()) {
-                EmptyState(message = when (selectedTab) {
-                    0 -> "暂无待取件包裹"
-                    1 -> "暂无运输中包裹"
-                    else -> "暂无已签收包裹"
-                })
+            if (displayParcels.isEmpty()) {
+                EmptyState(selectedTab)
             } else {
                 LazyColumn(
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    items(displayList, key = { it.waybillNo }) { parcel ->
-                        ParcelCard(
-                            parcel = parcel,
-                            onDelete = { vm.deleteParcel(parcel.waybillNo) },
-                            onMarkPicked = { vm.markPicked(parcel.waybillNo) }
-                        )
-                    }
-                }
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) { items(displayParcels, key = { it.waybillNo }) { parcel -> ParcelCard(parcel = parcel, onDelete = { vm.deleteParcel(parcel.waybillNo) }) } }
             }
         }
-    }
 
-    if (showAddDialog) {
-        AddParcelDialog(
-            onDismiss = { showAddDialog = false },
-            onConfirm = { waybillNo, platform ->
-                val now = System.currentTimeMillis()
-                val entity = ParcelEntity(
-                    waybillNo = waybillNo,
-                    shipperCode = "",
-                    shipperName = "未知",
-                    platform = platform,
-                    status = Status.NO_TRACE.value,
-                    createdAt = now,
-                    updatedAt = now
-                )
-                vm.upsertParcel(entity)
-                showAddDialog = false
-            }
-        )
+        if (addDialogVisible) {
+            AddParcelDialog(
+                isLoading = isAdding,
+                onDismiss = { vm.hideAddParcelDialog() },
+                onConfirm = { waybill, platform -> vm.addParcelWithQuery(waybill, platform) }
+            )
+        }
     }
 }
 
 @Composable
-private fun ParcelCard(
-    parcel: ParcelEntity,
-    onDelete: () -> Unit,
-    onMarkPicked: () -> Unit
-) {
+private fun ParcelCard(parcel: ParcelEntity, onDelete: () -> Unit) {
     var expanded by remember { mutableStateOf(false) }
-    val statusColor = when (Status.fromValue(parcel.status)) {
-        Status.ARRIVED -> Color(0xFF4CAF50)
-        Status.IN_TRANSIT -> Color(0xFF2196F3)
-        Status.SIGNED -> Color(0xFF9E9E9E)
-        Status.NO_TRACE -> Color(0xFFFF9800)
-        else -> Color(0xFF9E9E9E)
-    }
+    val statusEnum = Status.fromValue(parcel.status)
 
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { expanded = !expanded },
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White)
+        modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded },
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            // Header row
+        Column(modifier = Modifier.padding(12.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = maskWaybill(parcel.waybillNo),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = parcel.shipperName,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color(0xFF666666)
-                    )
+                    Text(text = maskWaybill(parcel.waybillNo), fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Text(text = "来源：" + (parcel.platform ?: "—"), fontSize = 12.sp, color = Color.Gray)
+                    if (!parcel.shipperName.isNullOrBlank()) { Text(text = "快递公司：" + parcel.shipperName, fontSize = 12.sp, color = Color.Gray) }
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    parcel.pickupCode?.let { code ->
-                        Text(
-                            text = "取件码: $code",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = Color(0xFFE53935),
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                    }
-                    Box(
-                        modifier = Modifier
-                            .background(statusColor, RoundedCornerShape(4.dp))
-                            .padding(horizontal = 8.dp, vertical = 2.dp)
-                    ) {
-                        Text(
-                            text = Status.fromValue(parcel.status).displayName,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color.White
-                        )
-                    }
+                    StatusBadge(statusEnum)
+                    IconButton(onClick = onDelete) { Icon(Icons.Default.Delete, contentDescription = "删除", tint = Color.Red) }
                 }
             }
-
-            parcel.stationName?.let { station ->
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = station,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color(0xFF888888)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = formatDate(parcel.updatedAt),
-                style = MaterialTheme.typography.bodySmall,
-                color = Color(0xFFAAAAAA)
-            )
-
-            // Expanded details
-            AnimatedVisibility(visible = expanded) {
-                Column(modifier = Modifier.padding(top = 12.dp)) {
-                    parcel.latestTrace?.let { trace ->
-                        Text(
-                            text = "最新动态: $trace",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color(0xFF555555),
-                            maxLines = 3,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                    }
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End
-                    ) {
-                        if (parcel.status == Status.ARRIVED.value) {
-                            Button(
-                                onClick = onMarkPicked,
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFF4CAF50)
-                                )
-                            ) {
-                                Text("标记已取")
-                            }
-                            Spacer(modifier = Modifier.width(8.dp))
-                        }
-                        IconButton(onClick = onDelete) {
-                            Icon(
-                                Icons.Default.Delete,
-                                contentDescription = "删除",
-                                tint = Color(0xFFE53935)
-                            )
-                        }
-                        Icon(
-                            if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                            contentDescription = null
-                        )
-                    }
-                }
-            }
+            if (!parcel.pickupCode.isNullOrBlank()) { Text(text = "取件码: " + parcel.pickupCode, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 4.dp)) }
+            if (!parcel.stationName.isNullOrBlank()) { Text(text = parcel.stationName, fontSize = 12.sp, color = Color.Gray) }
+            Text(text = formatDate(parcel.updatedAt), fontSize = 11.sp, color = Color.LightGray)
+            AnimatedVisibility(visible = expanded) { Column(modifier = Modifier.padding(top = 8.dp)) { if (!parcel.latestTrace.isNullOrBlank()) { Text(text = parcel.latestTrace, fontSize = 12.sp, color = Color.DarkGray) } } }
         }
     }
 }
 
 @Composable
-private fun AddParcelDialog(onDismiss: () -> Unit, onConfirm: (waybillNo: String, platform: String?) -> Unit) {
-    var waybillNo by remember { mutableStateOf("") }
-    var expanded by remember { mutableStateOf(false) }
-    val platforms = listOf("淘宝", "拼多多", "京东", "顺丰", "其他", null)
-    val platformLabels = listOf("淘宝", "拼多多", "京东", "顺丰", "其他", "未知")
-    var selectedPlatform by remember { mutableStateOf<String?>(null) }
+private fun StatusBadge(status: Status) {
+    val (bgColor, textColor) = when (status) { Status.ARRIVED -> Color(0xFFFFF3E0) to Color(0xFFE65100); Status.IN_TRANSIT -> Color(0xFFE3F2FD) to Color(0xFF1565C0); Status.SIGNED -> Color(0xFFE8F5E9) to Color(0xFF2E7D32); Status.COLLECTED -> Color(0xFFE3F2FD) to Color(0xFF1565C0); else -> Color(0xFFF5F5F5) to Color(0xFF757575) }
+    Box(modifier = Modifier.background(bgColor, RoundedCornerShape(4.dp)).padding(horizontal = 8.dp, vertical = 2.dp)) { Text(text = status.displayName, fontSize = 10.sp, color = textColor, fontWeight = FontWeight.Medium) }
+}
 
+@Composable
+private fun EmptyState(tabIndex: Int) {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        val message = when (tabIndex) { 0 -> "暂无待取件包裹"; 1 -> "暂无运输中包裹"; else -> "暂无已签收包裹" }
+        Text(text = message, color = Color.Gray)
+    }
+}
+
+@Composable
+private fun AddParcelDialog(isLoading: Boolean, onDismiss: () -> Unit, onConfirm: (String, String?) -> Unit) {
+    var waybillNo by remember { mutableStateOf("") }; var expanded by remember { mutableStateOf(false) }; var selectedPlatform by remember { mutableStateOf<String?>(null) }
+    val platforms = listOf("圆通速递", "顺丰速运", "京东物流", "EMS", "菜鸟驿站")
     AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("手动录入运单") },
-        text = {
-            Column {
-                OutlinedTextField(
-                    value = waybillNo,
-                    onValueChange = { waybillNo = it },
-                    label = { Text("运单号") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Box {
-                    OutlinedTextField(
-                        value = platformLabels[platforms.indexOf(selectedPlatform)],
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("平台") },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { expanded = true }
-                    )
-                    DropdownMenu(
-                        expanded = expanded,
-                        onDismissRequest = { expanded = false }
-                    ) {
-                        platformLabels.forEachIndexed { index, label ->
-                            DropdownMenuItem(
-                                text = { Text(label) },
-                                onClick = {
-                                    selectedPlatform = platforms[index]
-                                    expanded = false
-                                }
-                            )
-                        }
-                    }
+        onDismissRequest = { if (!isLoading) onDismiss() },
+        title = { Text("添加包裹") },
+        text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(value = waybillNo, onValueChange = { waybillNo = it.uppercase() }, label = { Text("运单号") }, singleLine = true, enabled = !isLoading, modifier = Modifier.fillMaxWidth())
+            Box {
+                OutlinedTextField(value = selectedPlatform ?: "自动识别", onValueChange = {}, label = { Text("快递公司") }, readOnly = true, enabled = !isLoading, modifier = Modifier.fillMaxWidth().clickable { expanded = true })
+                DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                    DropdownMenuItem(text = { Text("自动识别") }, onClick = { selectedPlatform = null; expanded = false })
+                    platforms.forEach { p -> DropdownMenuItem(text = { Text(p) }, onClick = { selectedPlatform = p; expanded = false }) }
                 }
             }
-        },
-        confirmButton = {
-            Button(
-                onClick = { if (waybillNo.isNotBlank()) onConfirm(waybillNo.trim(), selectedPlatform) },
-                enabled = waybillNo.isNotBlank()
-            ) {
-                Text("确认")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("取消")
-            }
-        }
+        } },
+        confirmButton = { Button(onClick = { onConfirm(waybillNo, selectedPlatform) }, enabled = waybillNo.isNotBlank() && !isLoading) { if (isLoading) { CircularProgressIndicator(modifier = Modifier.height(16.dp).width(16.dp), strokeWidth = 2.dp, color = Color.White) } else { Text("确认") } } },
+        dismissButton = { TextButton(onClick = onDismiss, enabled = !isLoading) { Text("取消") } }
     )
 }
 
-@Composable
-private fun EmptyState(message: String) {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                text = "\uD83D\uDCE6",
-                style = MaterialTheme.typography.displayLarge
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodyLarge,
-                color = Color(0xFF999999)
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "点击右下角 + 按钮录入第一个包裹",
-                style = MaterialTheme.typography.bodySmall,
-                color = Color(0xFFBBBBBB)
-            )
-        }
-    }
-}
-
-private data class GroupedParcels(
-    val pending: List<ParcelEntity>,
-    val inTransit: List<ParcelEntity>,
-    val signed: List<ParcelEntity>
+private fun groupParcels(parcels: List<ParcelEntity>): GroupedParcels = GroupedParcels(
+    pending = parcels.filter { it.status == Status.ARRIVED.value || it.status == Status.NO_TRACE.value },
+    inTransit = parcels.filter { it.status == Status.IN_TRANSIT.value || it.status == Status.COLLECTED.value },
+    delivered = parcels.filter { it.status == Status.SIGNED.value }
 )
 
-private fun groupParcels(parcels: List<ParcelEntity>): GroupedParcels {
-    val pending = parcels.filter { it.status == Status.ARRIVED.value && it.signedAt == null }
-    val inTransit = parcels.filter {
-        it.status in listOf(
-            Status.IN_TRANSIT.value,
-            Status.COLLECTED.value,
-            Status.NO_TRACE.value
-        )
-    }
-    val signed = parcels.filter { it.status == Status.SIGNED.value }
-    return GroupedParcels(pending, inTransit, signed)
-}
+private fun maskWaybill(no: String): String = if (no.length > 6) no.take(3) + "****" + no.takeLast(3) else no
 
-private fun maskWaybill(no: String): String {
-    return if (no.length >= 8) {
-        no.take(4) + "***" + no.takeLast(4)
-    } else {
-        no
-    }
-}
-
-private fun formatDate(ts: Long): String {
-    return SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date(ts))
-}
+private fun formatDate(ts: Long): String { if (ts == 0L) return ""; val sdf = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault()); return sdf.format(java.util.Date(ts)) }

@@ -2,6 +2,7 @@ package com.pickuphelper.viewmodel
 
 import android.content.Context
 import android.net.Uri
+import android.provider.Settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -9,6 +10,7 @@ import com.pickuphelper.data.local.AppDatabase
 import com.pickuphelper.data.local.ExportManager
 import com.pickuphelper.data.local.ParcelEntity
 import com.pickuphelper.data.provider.ProviderConfig
+import com.pickuphelper.data.provider.ProviderManager
 import com.pickuphelper.domain.model.DailyTrendItem
 import com.pickuphelper.domain.model.PlatformCount
 import com.pickuphelper.domain.model.ShipperCountDim
@@ -16,12 +18,12 @@ import com.pickuphelper.domain.model.StationCountDim
 import com.pickuphelper.domain.model.StatsSummary
 import com.pickuphelper.domain.model.Status
 import com.pickuphelper.domain.model.StatusCountDim
-import com.pickuphelper.domain.model.StatusMapper
+import com.pickuphelper.service.ShipperCodeDetector
+import com.pickuphelper.service.FloatingWindowService
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.util.Calendar
@@ -31,77 +33,126 @@ class MainViewModel(
     private val context: Context
 ) : ViewModel() {
 
-    // ── Parcel list (observes DB in real-time) ─────────────────────────────────
     val parcels: StateFlow<List<ParcelEntity>> = database.parcelDao()
         .getAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    // ── Statistics (5 dimensions) ─────────────────────────────────────────────
     private val _stats = MutableStateFlow(StatsSummary())
     val stats: StateFlow<StatsSummary> = _stats.asStateFlow()
 
-    // ── Provider active label ─────────────────────────────────────────────────
     private val _providerActive = MutableStateFlow(ProviderConfig.ACTIVE_MOCK)
     val providerActive: StateFlow<String> = _providerActive.asStateFlow()
 
-    // ── CSV export result ─────────────────────────────────────────────────────
     private val _exportUri = MutableStateFlow<Uri?>(null)
     val exportUri: StateFlow<Uri?> = _exportUri.asStateFlow()
+
+    private val _isAddingParcel = MutableStateFlow(false)
+    val isAddingParcel: StateFlow<Boolean> = _isAddingParcel.asStateFlow()
+
+    private val _addParcelError = MutableStateFlow<String?>(null)
+    val addParcelError: StateFlow<String?> = _addParcelError.asStateFlow()
+
+    // Bug2: success feedback
+    private val _addParcelSuccess = MutableStateFlow<String?>(null)
+    val addParcelSuccess: StateFlow<String?> = _addParcelSuccess.asStateFlow()
+
+    // Floating ball enabled state (persisted in DataStore)
+    private val _floatingBallEnabled = MutableStateFlow(false)
+    val floatingBallEnabled: StateFlow<Boolean> = _floatingBallEnabled.asStateFlow()
+
+    private val _addParcelDialogVisible = MutableStateFlow(false)
+    val addParcelDialogVisible: StateFlow<Boolean> = _addParcelDialogVisible.asStateFlow()
+
+    fun showAddParcelDialog() { _addParcelDialogVisible.value = true }
+    fun hideAddParcelDialog() { _addParcelDialogVisible.value = false }
 
     init {
         refreshStats()
         _providerActive.value = ProviderConfig.getActive(context)
+        _floatingBallEnabled.value = ProviderConfig.getFloatingBallEnabled(context)
     }
 
     fun refreshStats() {
         viewModelScope.launch {
             val dao = database.parcelDao()
-            val now = System.currentTimeMillis()
-            val monthAgo = Calendar.getInstance().apply {
-                add(Calendar.MONTH, -1)
-            }.timeInMillis
-            val thirtyDaysAgo = Calendar.getInstance().apply {
-                add(Calendar.DAY_OF_YEAR, -30)
-            }.timeInMillis
+            val monthAgo = Calendar.getInstance().apply { add(Calendar.MONTH, -1) }.timeInMillis
+            val thirtyDaysAgo = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -30) }.timeInMillis
 
             val total = dao.getCountTotal()
             val thisMonth = dao.getCountThisMonth(monthAgo)
             val arrivedNotPicked = dao.getCountArrivedNotPicked()
             val signed = dao.getCountSigned()
 
-            val platformCounts = dao.getGroupByPlatform().map {
-                PlatformCount(platform = it.platform, count = it.count)
-            }
+            val platformCounts = dao.getGroupByPlatform().map { PlatformCount(platform = it.platform, count = it.count) }
             val statusCounts = dao.getGroupByStatus().map {
-                StatusCountDim(
-                    status = it.status,
-                    statusText = Status.fromValue(it.status).displayName,
-                    count = it.count
-                )
+                StatusCountDim(status = it.status, statusText = Status.fromValue(it.status).displayName, count = it.count)
             }
-            val shipperCounts = dao.getGroupByShipper().map {
-                ShipperCountDim(shipperName = it.shipperName, count = it.count)
-            }
-            val dailyTrend = dao.getDailyTrendSince(thirtyDaysAgo).map {
-                DailyTrendItem(date = it.date, count = it.count)
-            }
-            val topStations = dao.getTopStations(10).map {
-                StationCountDim(stationName = it.stationName, count = it.count)
-            }
+            val shipperCounts = dao.getGroupByShipper().map { ShipperCountDim(shipperName = it.shipperName, count = it.count) }
+            val dailyTrend = dao.getDailyTrendSince(thirtyDaysAgo).map { DailyTrendItem(date = it.date, count = it.count) }
+            val topStations = dao.getTopStations(10).map { StationCountDim(stationName = it.stationName, count = it.count) }
 
             _stats.value = StatsSummary(
-                totalCount = total,
-                thisMonthCount = thisMonth,
-                arrivedNotPickedCount = arrivedNotPicked,
-                signedCount = signed,
-                platformCounts = platformCounts,
-                statusCounts = statusCounts,
-                shipperCounts = shipperCounts,
-                dailyTrend = dailyTrend,
-                topStations = topStations
+                totalCount = total, thisMonthCount = thisMonth,
+                arrivedNotPickedCount = arrivedNotPicked, signedCount = signed,
+                platformCounts = platformCounts, statusCounts = statusCounts,
+                shipperCounts = shipperCounts, dailyTrend = dailyTrend, topStations = topStations
             )
         }
     }
+
+    fun addParcelWithQuery(waybillNo: String, platform: String?) {
+        if (_isAddingParcel.value) return
+        _isAddingParcel.value = true
+        _addParcelError.value = null
+        _addParcelSuccess.value = null
+
+        viewModelScope.launch {
+            val now = System.currentTimeMillis()
+            val shipperCode = ShipperCodeDetector.detect(waybillNo)
+            val shipperName = shipperCode?.let { ShipperCodeDetector.detectWithName(waybillNo)?.second } ?: "未知快递"
+
+            try {
+                val provider = ProviderManager.get(context)
+                val result = provider.query(waybillNo, shipperCode)
+
+                if (result.failure != null) {
+                    val entity = ParcelEntity(
+                        waybillNo = waybillNo, shipperCode = shipperCode ?: "",
+                        shipperName = shipperName, platform = platform,
+                        status = Status.NO_TRACE.value, latestTrace = null,
+                        createdAt = now, updatedAt = now
+                    )
+                    database.parcelDao().upsert(entity)
+                    _addParcelError.value = result.failure.message
+                } else {
+                    val parcel = result.parcel!!
+                    val entity = ParcelEntity.fromDomain(
+                        if (platform != null) parcel.copy(platform = platform) else parcel
+                    )
+                    database.parcelDao().upsert(entity)
+                    // Bug2: success - auto-close dialog and show success snackbar
+                    val pickupInfo = if (!parcel.pickupCode.isNullOrBlank()) "，取件码 " + parcel.pickupCode else ""
+                    _addParcelSuccess.value = "已添加：" + parcel.shipperName + " " + waybillNo + pickupInfo
+                    _addParcelDialogVisible.value = false
+                }
+            } catch (e: Exception) {
+                val entity = ParcelEntity(
+                    waybillNo = waybillNo, shipperCode = shipperCode ?: "",
+                    shipperName = shipperName, platform = platform,
+                    status = Status.NO_TRACE.value, latestTrace = null,
+                    createdAt = now, updatedAt = now
+                )
+                database.parcelDao().upsert(entity)
+                _addParcelError.value = "查询失败：${e.message}"
+            } finally {
+                _isAddingParcel.value = false
+                refreshStats()
+            }
+        }
+    }
+
+    fun clearAddParcelError() { _addParcelError.value = null }
+    fun clearAddParcelSuccess() { _addParcelSuccess.value = null }
 
     fun upsertParcel(parcel: ParcelEntity) {
         viewModelScope.launch {
@@ -132,27 +183,39 @@ class MainViewModel(
     }
 
     fun saveEBusinessId(id: String) {
-        viewModelScope.launch {
-            ProviderConfig.setEBusinessId(context, id)
-        }
+        viewModelScope.launch { ProviderConfig.setEBusinessId(context, id) }
     }
 
     fun saveAppKey(key: String) {
-        viewModelScope.launch {
-            ProviderConfig.setAppKey(context, key)
-        }
+        viewModelScope.launch { ProviderConfig.setAppKey(context, key) }
     }
 
     fun exportCsv() {
         viewModelScope.launch {
-            val currentParcels = parcels.value
-            val uri = ExportManager.exportToCsv(context, currentParcels)
+            val uri = ExportManager.exportToCsv(context, parcels.value)
             _exportUri.value = uri
         }
     }
 
-    fun clearExportUri() {
-        _exportUri.value = null
+    fun clearExportUri() { _exportUri.value = null }
+
+    /** Toggle floating ball on/off. */
+    fun setFloatingBallEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            ProviderConfig.setFloatingBallEnabled(context, enabled)
+            _floatingBallEnabled.value = enabled
+            if (enabled) {
+                FloatingWindowService.start(context)
+            } else {
+                FloatingWindowService.stop(context)
+            }
+        }
+    }
+
+    fun startFloatingBallIfEnabled() {
+        if (ProviderConfig.getFloatingBallEnabled(context) && Settings.canDrawOverlays(context)) {
+            FloatingWindowService.start(context)
+        }
     }
 
     class Factory(private val database: AppDatabase, private val context: Context) : ViewModelProvider.Factory {

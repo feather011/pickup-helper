@@ -1,6 +1,7 @@
 package com.pickuphelper
 
 import android.os.Bundle
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -26,6 +27,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.pickuphelper.service.FloatingWindowService
 import com.pickuphelper.ui.screens.ParcelListScreen
 import com.pickuphelper.ui.screens.SettingsScreen
 import com.pickuphelper.ui.screens.StatsScreen
@@ -33,11 +35,17 @@ import com.pickuphelper.ui.theme.PickupHelperTheme
 import com.pickuphelper.viewmodel.MainViewModel
 
 class MainActivity : ComponentActivity() {
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
         val database = (application as PickupHelperApp).database
+
+        // Start floating service if overlay permission already granted AND floating ball enabled
+        if (Settings.canDrawOverlays(this) && com.pickuphelper.data.provider.ProviderConfig.getFloatingBallEnabled(this)) {
+            FloatingWindowService.start(this)
+        }
 
         setContent {
             PickupHelperTheme {
@@ -53,12 +61,17 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    override fun onResume() {
+        super.onResume()
+        // Re-check after returning from permission settings
+        if (Settings.canDrawOverlays(this) && com.pickuphelper.data.provider.ProviderConfig.getFloatingBallEnabled(this)) {
+            FloatingWindowService.start(this)
+        }
+    }
 }
 
-private enum class BottomNavItem(
-    val label: String,
-    val icon: ImageVector
-) {
+private enum class BottomNavItem(val label: String, val icon: ImageVector) {
     ParcelList("包裹列表", Icons.Default.Inventory),
     Stats("统计", Icons.Default.BarChart),
     Settings("设置", Icons.Default.Settings)

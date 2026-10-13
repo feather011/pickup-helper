@@ -3,6 +3,7 @@ package com.pickuphelper.data.provider
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -15,9 +16,11 @@ object ProviderConfig {
     const val ACTIVE_MOCK = "mock"
     const val ACTIVE_KDNIAO = "kdniao"
 
-    // Default to mock for Phase 0
     private val ACTIVE_KEY = stringPreferencesKey("active_provider")
     private var cachedActive: String? = null
+
+    private val FLOATING_BALL_KEY = booleanPreferencesKey("floating_ball_enabled")
+    private var cachedFloatingBall: Boolean? = null
 
     fun getActive(context: Context): String {
         cachedActive?.let { return it }
@@ -29,34 +32,39 @@ object ProviderConfig {
 
     suspend fun setActive(context: Context, value: String) {
         cachedActive = value
-        context.dataStore.edit { prefs ->
-            prefs[ACTIVE_KEY] = value
-        }
+        context.dataStore.edit { prefs -> prefs[ACTIVE_KEY] = value }
+    }
+
+    fun getFloatingBallEnabled(context: Context): Boolean {
+        cachedFloatingBall?.let { return it }
+        return runBlocking {
+            val prefs = context.dataStore.data.first()
+            prefs[FLOATING_BALL_KEY] ?: false
+        }.also { cachedFloatingBall = it }
+    }
+
+    suspend fun setFloatingBallEnabled(context: Context, enabled: Boolean) {
+        cachedFloatingBall = enabled
+        context.dataStore.edit { prefs -> prefs[FLOATING_BALL_KEY] = enabled }
     }
 
     fun getEBusinessId(context: Context): String? {
         return runBlocking {
-            val prefs = context.dataStore.data.first()
-            prefs[stringPreferencesKey("ebusiness_id")]
+            context.dataStore.data.first()[stringPreferencesKey("ebusiness_id")]
         }
     }
 
     suspend fun setEBusinessId(context: Context, value: String) {
-        context.dataStore.edit { prefs ->
-            prefs[stringPreferencesKey("ebusiness_id")] = value
-        }
+        context.dataStore.edit { prefs -> prefs[stringPreferencesKey("ebusiness_id")] = value }
     }
 
     fun getAppKey(context: Context): String? {
         return runBlocking {
-            val prefs = context.dataStore.data.first()
-            prefs[stringPreferencesKey("app_key")]
+            context.dataStore.data.first()[stringPreferencesKey("app_key")]
         }
     }
 
     suspend fun setAppKey(context: Context, value: String) {
-        context.dataStore.edit { prefs ->
-            prefs[stringPreferencesKey("app_key")] = value
-        }
+        context.dataStore.edit { prefs -> prefs[stringPreferencesKey("app_key")] = value }
     }
 }

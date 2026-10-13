@@ -1,6 +1,8 @@
 package com.pickuphelper.ui.screens
 
 import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -17,16 +19,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -49,6 +49,7 @@ fun SettingsScreen(vm: MainViewModel) {
     val context = LocalContext.current
     val providerActive by vm.providerActive.collectAsState()
     val exportUri by vm.exportUri.collectAsState()
+    val floatingBallEnabled by vm.floatingBallEnabled.collectAsState()
 
     var ebusinessId by remember { mutableStateOf("") }
     var appKey by remember { mutableStateOf("") }
@@ -60,7 +61,6 @@ fun SettingsScreen(vm: MainViewModel) {
         appKey = ProviderConfig.getAppKey(context) ?: ""
     }
 
-    // Handle CSV export intent
     LaunchedEffect(exportUri) {
         exportUri?.let { uri ->
             val shareIntent = Intent(Intent.ACTION_SEND).apply {
@@ -80,6 +80,53 @@ fun SettingsScreen(vm: MainViewModel) {
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        // ── Floating Ball Switch ──────────────────────────────────────────────
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "悬浮球",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = if (floatingBallEnabled) "已开启 — 浮窗常驻桌面边缘" else "已关闭",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (floatingBallEnabled) Color(0xFF4CAF50) else Color(0xFF888888)
+                    )
+                }
+                Switch(
+                    checked = floatingBallEnabled,
+                    onCheckedChange = { enabled ->
+                        if (enabled) {
+                            if (Settings.canDrawOverlays(context)) {
+                                vm.setFloatingBallEnabled(true)
+                            } else {
+                                context.startActivity(
+                                    Intent(
+                                        Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                        Uri.parse("package:${context.packageName}")
+                                    )
+                                )
+                            }
+                        } else {
+                            vm.setFloatingBallEnabled(false)
+                        }
+                    }
+                )
+            }
+        }
+
         // ── BYOK Key Section ────────────────────────────────────────────────
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -126,9 +173,7 @@ fun SettingsScreen(vm: MainViewModel) {
                             vm.saveAppKey(appKey)
                             saveMessage = "密钥已保存"
                         }
-                    ) {
-                        Text("保存密钥")
-                    }
+                    ) { Text("保存密钥") }
                 }
                 saveMessage?.let { msg ->
                     Spacer(modifier = Modifier.height(4.dp))
@@ -228,9 +273,7 @@ fun SettingsScreen(vm: MainViewModel) {
                 Button(
                     onClick = { vm.exportCsv() },
                     modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("导出 CSV")
-                }
+                ) { Text("导出 CSV") }
             }
         }
 
