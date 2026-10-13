@@ -63,6 +63,14 @@ class MainViewModel(
     private val _addParcelDialogVisible = MutableStateFlow(false)
     val addParcelDialogVisible: StateFlow<Boolean> = _addParcelDialogVisible.asStateFlow()
 
+    // Delete confirmation state
+    private val _deleteConfirmVisible = MutableStateFlow(false)
+    val deleteConfirmVisible: StateFlow<Boolean> = _deleteConfirmVisible.asStateFlow()
+    private val _deleteTarget = MutableStateFlow<String?>(null)
+    val deleteTarget: StateFlow<String?> = _deleteTarget.asStateFlow()
+    private val _deleteSuccess = MutableStateFlow<String?>(null)
+    val deleteSuccess: StateFlow<String?> = _deleteSuccess.asStateFlow()
+
     fun showAddParcelDialog() { _addParcelDialogVisible.value = true }
     fun hideAddParcelDialog() { _addParcelDialogVisible.value = false }
 
@@ -149,7 +157,30 @@ class MainViewModel(
         }
     }
 
-    fun deleteParcel(waybillNo: String) {
+    fun showDeleteConfirmDialog(waybillNo: String) {
+        _deleteTarget.value = waybillNo
+        _deleteConfirmVisible.value = true
+    }
+
+    fun hideDeleteConfirmDialog() {
+        _deleteConfirmVisible.value = false
+        _deleteTarget.value = null
+    }
+
+    fun confirmDelete() {
+        val waybillNo = _deleteTarget.value ?: return
+        viewModelScope.launch {
+            database.parcelDao().deleteByWaybillNo(waybillNo)
+            refreshStats()
+            _deleteSuccess.value = "已删除：" + waybillNo
+            _deleteConfirmVisible.value = false
+            _deleteTarget.value = null
+        }
+    }
+
+    fun clearDeleteSuccess() { _deleteSuccess.value = null }
+
+    private fun deleteParcel(waybillNo: String) {
         viewModelScope.launch {
             database.parcelDao().deleteByWaybillNo(waybillNo)
             refreshStats()

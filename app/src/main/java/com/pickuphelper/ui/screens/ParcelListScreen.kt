@@ -74,6 +74,9 @@ fun ParcelListScreen(vm: MainViewModel) {
     val addError by vm.addParcelError.collectAsState()
     val addDialogVisible by vm.addParcelDialogVisible.collectAsState()
     val addSuccess by vm.addParcelSuccess.collectAsState()
+    val deleteConfirmVisible by vm.deleteConfirmVisible.collectAsState()
+    val deleteTarget by vm.deleteTarget.collectAsState()
+    val deleteSuccess by vm.deleteSuccess.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     var selectedTab by remember { mutableIntStateOf(0) }
     val grouped = remember(parcels) { groupParcels(parcels) }
@@ -129,7 +132,7 @@ fun ParcelListScreen(vm: MainViewModel) {
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) { items(displayParcels, key = { it.waybillNo }) { parcel -> ParcelCard(parcel = parcel, onDelete = { vm.deleteParcel(parcel.waybillNo) }) } }
+                ) { items(displayParcels, key = { it.waybillNo }) { parcel -> ParcelCard(parcel = parcel, onDelete = { vm.showDeleteConfirmDialog(parcel.waybillNo) }) } }
             }
         }
 
@@ -138,6 +141,16 @@ fun ParcelListScreen(vm: MainViewModel) {
                 isLoading = isAdding,
                 onDismiss = { vm.hideAddParcelDialog() },
                 onConfirm = { waybill, platform -> vm.addParcelWithQuery(waybill, platform) }
+            )
+        }
+
+        if (deleteConfirmVisible && deleteTarget != null) {
+            AlertDialog(
+                onDismissRequest = { vm.hideDeleteConfirmDialog() },
+                title = { Text("删除包裹") },
+                text = { Text("确定要删除运单 " + deleteTarget + " 吗？删除后不可恢复。") },
+                confirmButton = { Button(onClick = { vm.confirmDelete() }) { Text("删除", color = Color.White) } },
+                dismissButton = { TextButton(onClick = { vm.hideDeleteConfirmDialog() }) { Text("取消") } }
             )
         }
     }
