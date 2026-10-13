@@ -58,9 +58,9 @@ class FloatCardView(
             )
         }
         when (state) {
-            is FloatingUiState.Loading -> content.addView(TextView(context).apply { text = "query in progress..."; textSize = 16f; setTextColor(Color.DKGRAY) })
+            is FloatingUiState.Loading -> content.addView(TextView(context).apply { text = "查询中..."; textSize = 16f; setTextColor(Color.DKGRAY) })
             is FloatingUiState.Success -> buildSuccess(content, state)
-            is FloatingUiState.Failure -> buildFailure(content, state.message)
+            is FloatingUiState.Failure -> buildFailure(content, state.message, state.waybillNo)
             FloatingUiState.Idle -> buildIdle(content)
         }
         cardWrapper.addView(content)
@@ -69,13 +69,13 @@ class FloatCardView(
     private fun buildIdle(content: LinearLayout) {
         val ctx = context
         content.addView(TextView(ctx).apply {
-            text = "\uD83D\uDCE6 query pickup code"
+            text = "\uD83D\uDCE6 快递取件码查询"
             textSize = 15f
             setTextColor(Color.parseColor("#333333"))
             typeface = android.graphics.Typeface.DEFAULT_BOLD
         })
         val input = EditText(ctx).apply {
-            hint = "enter waybill no"
+            hint = "请输入或粘贴运单号"
             textSize = 14f
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -98,13 +98,13 @@ class FloatCardView(
             gravity = Gravity.END
         }
         row.addView(Button(ctx).apply {
-            text = "cancel"
+            text = "取消"
             layoutParams = LinearLayout.LayoutParams(dpToPx(96), dpToPx(44))
             setOnClickListener { onDismiss() }
         })
         spacerH(row, 8)
         row.addView(Button(ctx).apply {
-            text = "query"
+            text = "查询"
             layoutParams = LinearLayout.LayoutParams(dpToPx(96), dpToPx(44))
             setOnClickListener {
                 val text = input.text.toString().trim()
@@ -118,9 +118,9 @@ class FloatCardView(
 
     private fun buildSuccess(content: LinearLayout, s: FloatingUiState.Success) {
         val ctx = context
-        content.addView(TextView(ctx).apply { text = "waybill: " + s.waybillNo.takeLast(4) + "  |  " + s.shipperName; textSize = 14f; setTextColor(Color.parseColor("#555555")) })
+        content.addView(TextView(ctx).apply { text = "运单尾号: " + s.waybillNo.takeLast(4) + "  |  " + s.shipperName; textSize = 14f; setTextColor(Color.parseColor("#555555")) })
         spacer(content, 8)
-        val statusTxt = if (s.pickupCode != null) "\u2705 " + s.statusText + "  code: " + s.pickupCode else "\uD83D\uDCCB " + s.statusText
+        val statusTxt = if (s.pickupCode != null) "\u2705 " + s.statusText + "  取件码: " + s.pickupCode else "\uD83D\uDCCB " + s.statusText
         content.addView(TextView(ctx).apply { text = statusTxt; textSize = 16f; setTextColor(Color.BLACK); typeface = android.graphics.Typeface.DEFAULT_BOLD })
         s.stationName?.let { spacer(content, 4); content.addView(TextView(ctx).apply { text = "\uD83D\uDCCD " + it; textSize = 13f; setTextColor(Color.parseColor("#666666")) }) }
         if (s.lastTrace.isNotBlank()) { spacer(content, 4); content.addView(TextView(ctx).apply { text = s.lastTrace; textSize = 12f; setTextColor(Color.parseColor("#888888")); maxLines = 2 }) }
@@ -133,26 +133,27 @@ class FloatCardView(
             )
         }
         row.addView(Button(ctx).apply {
-            text = "dismiss"
+            text = "忽略"
             layoutParams = LinearLayout.LayoutParams(dpToPx(96), dpToPx(44))
             setOnClickListener { onDismiss() }
         })
         row.addView(Button(ctx).apply {
-            text = "detail"
+            text = "查看详情"
             layoutParams = LinearLayout.LayoutParams(dpToPx(96), dpToPx(44))
             setOnClickListener { onOpenApp() }
         })
         content.addView(row)
     }
 
-    private fun buildFailure(content: LinearLayout, msg: String) {
+    private fun buildFailure(content: LinearLayout, msg: String, waybillNo: String?) {
         val ctx = context
-        content.addView(TextView(ctx).apply { text = "\u274C query failed"; textSize = 16f; setTextColor(Color.RED) })
+        content.addView(TextView(ctx).apply { text = "\u274C 查询失败"; textSize = 16f; setTextColor(Color.RED) })
         content.addView(TextView(ctx).apply { text = msg; textSize = 13f; setTextColor(Color.DKGRAY); maxLines = 3 })
         spacer(content, 12)
         val input = EditText(ctx).apply {
-            hint = "retry waybill no"
+            hint = "重新输入运单号"
             textSize = 14f
+            setText(waybillNo ?: "")
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
@@ -174,13 +175,13 @@ class FloatCardView(
             gravity = Gravity.END
         }
         row.addView(Button(ctx).apply {
-            text = "close"
+            text = "关闭"
             layoutParams = LinearLayout.LayoutParams(dpToPx(96), dpToPx(44))
             setOnClickListener { onDismiss() }
         })
         spacerH(row, 8)
         row.addView(Button(ctx).apply {
-            text = "retry"
+            text = "重试"
             layoutParams = LinearLayout.LayoutParams(dpToPx(96), dpToPx(44))
             setOnClickListener {
                 val text = input.text.toString().trim()

@@ -33,7 +33,7 @@ class KuaidiNiaoProviderStub : PickupProvider {
         return PickupResult(
             failure = Failure(
                 type = FailureType.UNKNOWN,
-                message = "KuaidiNiao provider not configured yet"
+                message = "快递鸟接口尚未配置，请先在设置中填写 API 密钥"
             )
         )
     }

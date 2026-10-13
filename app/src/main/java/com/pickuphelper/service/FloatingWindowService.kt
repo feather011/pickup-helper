@@ -49,8 +49,8 @@ class FloatingWindowService : LifecycleService() {
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(CHANNEL_ID, "float window service", NotificationManager.IMPORTANCE_LOW).apply {
-                description = "pickup helper floating service"
+            val channel = NotificationChannel(CHANNEL_ID, "浮窗服务", NotificationManager.IMPORTANCE_LOW).apply {
+                description = "快递取件码浮窗助手常驻服务"
                 setShowBadge(false)
             }
             getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
@@ -60,8 +60,8 @@ class FloatingWindowService : LifecycleService() {
     private fun buildNotification(): Notification {
         val pendingIntent = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("pickup helper")
-            .setContentText("tap to manage")
+            .setContentTitle("快递取件码浮窗")
+            .setContentText("点击查看或管理浮窗")
             .setSmallIcon(android.R.drawable.ic_menu_send)
             .setContentIntent(pendingIntent).setOngoing(true).build()
     }

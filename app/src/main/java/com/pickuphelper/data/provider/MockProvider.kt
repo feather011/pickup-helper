@@ -35,7 +35,7 @@ class MockProvider : PickupProvider {
         return if (sample != null) {
             sample
         } else {
-            // Unknown waybillNo — return NOT_FOUND failure so MainViewModel shows error feedback
+            // 未知运单号——返回 NOT_FOUND 失败，由 MainViewModel 弹错误提示（不落库）
             PickupResult(
                 parcel = null,
                 failure = Failure(
@@ -46,13 +46,13 @@ class MockProvider : PickupProvider {
         }
     }
 
-    // ─── Sample Builders ───────────────────────────────────────────────
+    // ─── 样本构建器 ──────────────────────────────────────────────────
 
     private fun makeNormalCainiao(): PickupResult {
         val waybillNo = "YT001"
         val shipperCode = "YTO"
         val now = System.currentTimeMillis()
-        val arrivedAt = now - 3600_000 // 1 hour ago
+        val arrivedAt = now - 3600_000 // 一小时前
 
         val traces = listOf(
             Trace(waybillNo, "2026-10-13 08:00:00", "【北京市】快件已发货", Status.COLLECTED),
