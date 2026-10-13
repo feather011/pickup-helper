@@ -4,10 +4,16 @@ import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.os.Build
+import com.pickuphelper.data.local.AppDatabase
 
 class PickupHelperApp : Application() {
+
+    lateinit var database: AppDatabase
+        private set
+
     override fun onCreate() {
         super.onCreate()
+        database = AppDatabase.getInstance(this)
         createNotificationChannel()
     }
 
