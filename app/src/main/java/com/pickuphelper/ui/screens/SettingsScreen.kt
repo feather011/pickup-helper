@@ -51,12 +51,20 @@ fun SettingsScreen(vm: MainViewModel) {
     val exportUri by vm.exportUri.collectAsState()
     val floatingBallEnabled by vm.floatingBallEnabled.collectAsState()
 
+    // 收件人手机号
+    var receiverPhone by remember { mutableStateOf("") }
+    // 后端服务地址
+    var backendUrl by remember { mutableStateOf("") }
+    // EBusinessID / APP_KEY（旧版参数，保留兼容）
     var ebusinessId by remember { mutableStateOf("") }
     var appKey by remember { mutableStateOf("") }
+    // 隐私政策展开
     var privacyExpanded by remember { mutableStateOf(false) }
     var saveMessage by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
+        receiverPhone = ProviderConfig.getReceiverPhone(context) ?: ""
+        backendUrl = ProviderConfig.getBackendUrl(context) ?: ""
         ebusinessId = ProviderConfig.getEBusinessId(context) ?: ""
         appKey = ProviderConfig.getAppKey(context) ?: ""
     }
@@ -115,7 +123,7 @@ fun SettingsScreen(vm: MainViewModel) {
                                 context.startActivity(
                                     Intent(
                                         Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                                        Uri.parse("package:${context.packageName}")
+                                        Uri.parse("package:$context.packageName")
                                     )
                                 )
                             }
@@ -127,7 +135,7 @@ fun SettingsScreen(vm: MainViewModel) {
             }
         }
 
-        // ── BYOK Key Section ────────────────────────────────────────────────
+        // ── Data Source Mode ────────────────────────────────────────────────
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -135,88 +143,148 @@ fun SettingsScreen(vm: MainViewModel) {
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
-                    text = "API 密钥配置",
+                    text = "数据源模式",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "密钥仅保存在本地，不会上传至任何服务器",
+                    text = "切换查询来源（Mock 仅供测试，真实接入需配置后端）",
                     style = MaterialTheme.typography.bodySmall,
                     color = Color(0xFF888888),
-                    modifier = Modifier.padding(bottom = 12.dp)
+                    modifier = Modifier.padding(bottom = 8.dp)
                 )
-
-                OutlinedTextField(
-                    value = ebusinessId,
-                    onValueChange = { ebusinessId = it },
-                    label = { Text("EBusinessID") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = appKey,
-                    onValueChange = { appKey = it },
-                    label = { Text("APP_KEY") },
-                    singleLine = true,
-                    visualTransformation = PasswordVisualTransformation(),
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
-                ) {
-                    Button(
-                        onClick = {
-                            vm.saveEBusinessId(ebusinessId)
-                            vm.saveAppKey(appKey)
-                            saveMessage = "密钥已保存"
-                        }
-                    ) { Text("保存密钥") }
-                }
-                saveMessage?.let { msg ->
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = msg,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color(0xFF4CAF50)
-                    )
-                }
-            }
-        }
-
-        // ── Provider Switch Section ─────────────────────────────────────────
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = "数据提供者",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(8.dp))
 
                 ProviderOption(
-                    label = "模拟数据 (Mock)",
-                    description = "使用本地模拟数据，无需网络",
+                    label = "模拟模式 (Mock)",
+                    description = "内置 6 个样例，无需网络（测试用）",
                     selected = providerActive == ProviderConfig.ACTIVE_MOCK,
                     onClick = { vm.setProviderActive(ProviderConfig.ACTIVE_MOCK) }
                 )
                 ProviderOption(
-                    label = "快递鸟真实API",
-                    description = "需配置上方 API 密钥（当前阶段不可用）",
+                    label = "真实 API (Kuaidi100)",
+                    description = "接入后端代理查询真实快递数据",
                     selected = providerActive == ProviderConfig.ACTIVE_KDNIAO,
-                    enabled = false,
                     onClick = { vm.setProviderActive(ProviderConfig.ACTIVE_KDNIAO) }
                 )
             }
         }
 
-        // ── Privacy Notice ─────────────────────────────────────────────────
+        // ── Kuaidi100 Settings ───────────────────────────────────────────
+        if (providerActive == ProviderConfig.ACTIVE_KDNIAO) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "Kuaidi100 真实 API 配置",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "App 不直接访问快递100，所有请求经后端代理转发",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color(0xFF888888),
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
+
+                    // 后端服务地址
+                    OutlinedTextField(
+                        value = backendUrl,
+                        onValueChange = { backendUrl = it },
+                        label = { Text("后端服务地址") },
+                        placeholder = { Text("http://<服务器IP>:8080") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // 收件人手机号
+                    OutlinedTextField(
+                        value = receiverPhone,
+                        onValueChange = { receiverPhone = it },
+                        label = { Text("收件人手机号 *") },
+                        placeholder = { Text("用于查询取件码（必填）") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Button(
+                        onClick = {
+                            if (backendUrl.isNotBlank()) vm.saveBackendUrl(backendUrl.trim())
+                            if (receiverPhone.isNotBlank()) vm.saveReceiverPhone(receiverPhone.trim())
+                            saveMessage = "配置已保存"
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("保存配置")
+                    }
+
+                    if (saveMessage != null) {
+                        Text(
+                            text = saveMessage!!,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFF4CAF50),
+                            modifier = Modifier.padding(top = 8.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // 旧版参数（保留兼容）
+                    Text(
+                        text = "旧版参数（可跳过，仅兼容旧后端）",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color(0xFF888888),
+                        modifier = Modifier.padding(bottom = 4.dp)
+                    )
+
+                    OutlinedTextField(
+                        value = ebusinessId,
+                        onValueChange = { ebusinessId = it },
+                        label = { Text("EBusinessID") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation()
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    OutlinedTextField(
+                        value = appKey,
+                        onValueChange = { appKey = it },
+                        label = { Text("APP_KEY") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation()
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                vm.saveEBusinessId(ebusinessId)
+                                vm.saveAppKey(appKey)
+                                saveMessage = "旧版参数已保存"
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("保存旧版参数")
+                        }
+                    }
+                }
+            }
+        }
+
+        // ── Privacy Policy ───────────────────────────────────────────────
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -231,12 +299,12 @@ fun SettingsScreen(vm: MainViewModel) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "隐私政策",
+                        text = "隐私政策与数据说明",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
                     Icon(
-                        if (privacyExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        imageVector = if (privacyExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
                         contentDescription = null
                     )
                 }
@@ -277,7 +345,7 @@ fun SettingsScreen(vm: MainViewModel) {
             }
         }
 
-        // ── App Info ───────────────────────────────────────────────────────
+        // ── App Info ─────────────────────────────────────────────────────
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -292,7 +360,10 @@ fun SettingsScreen(vm: MainViewModel) {
                 Spacer(modifier = Modifier.height(8.dp))
                 InfoRow("应用名称", "快递取件码浮窗助手")
                 InfoRow("版本", "1.0.0")
-                InfoRow("当前模式", if (providerActive == ProviderConfig.ACTIVE_MOCK) "模拟 (Mock)" else "真实API")
+                InfoRow(
+                    "当前模式",
+                    if (providerActive == ProviderConfig.ACTIVE_MOCK) "模拟 (Mock)" else "真实API (Kuaidi100)"
+                )
             }
         }
     }

@@ -22,6 +22,18 @@ object ProviderConfig {
     private val FLOATING_BALL_KEY = booleanPreferencesKey("floating_ball_enabled")
     private var cachedFloatingBall: Boolean? = null
 
+    // 收件人手机号（快递100 取件码接口硬要求）
+    private val RECEIVER_PHONE_KEY = stringPreferencesKey("receiver_phone")
+    private var cachedReceiverPhone: String? = null
+
+    // 后端服务地址（Ktor 代理服务 URL）
+    private val BACKEND_URL_KEY = stringPreferencesKey("backend_url")
+    private var cachedBackendUrl: String? = null
+
+    // EBusinessID / APP_KEY（已废弃，仅保留兼容，真实接入走后端代理）
+    private val EBUSINESS_ID_KEY = stringPreferencesKey("ebusiness_id")
+    private val APP_KEY_KEY = stringPreferencesKey("app_key")
+
     fun getActive(context: Context): String {
         cachedActive?.let { return it }
         return runBlocking {
@@ -48,23 +60,53 @@ object ProviderConfig {
         context.dataStore.edit { prefs -> prefs[FLOATING_BALL_KEY] = enabled }
     }
 
+    // ── 收件人手机号（Kuaidi100 取件码接口硬要求） ─────────────────────
+
+    fun getReceiverPhone(context: Context): String? {
+        cachedReceiverPhone?.let { return it }
+        return runBlocking {
+            context.dataStore.data.first()[RECEIVER_PHONE_KEY]
+        }.also { cachedReceiverPhone = it }
+    }
+
+    suspend fun setReceiverPhone(context: Context, value: String) {
+        cachedReceiverPhone = value
+        context.dataStore.edit { prefs -> prefs[RECEIVER_PHONE_KEY] = value }
+    }
+
+    // ── 后端服务地址（Ktor 代理） ───────────────────────────────────
+
+    fun getBackendUrl(context: Context): String? {
+        cachedBackendUrl?.let { return it }
+        return runBlocking {
+            context.dataStore.data.first()[BACKEND_URL_KEY]
+        }.also { cachedBackendUrl = it }
+    }
+
+    suspend fun setBackendUrl(context: Context, value: String) {
+        cachedBackendUrl = value
+        context.dataStore.edit { prefs -> prefs[BACKEND_URL_KEY] = value }
+    }
+
+    // ── EBusinessID / APP_KEY（已废弃兼容，真实接入走后端代理） ────────
+
     fun getEBusinessId(context: Context): String? {
         return runBlocking {
-            context.dataStore.data.first()[stringPreferencesKey("ebusiness_id")]
+            context.dataStore.data.first()[EBUSINESS_ID_KEY]
         }
     }
 
     suspend fun setEBusinessId(context: Context, value: String) {
-        context.dataStore.edit { prefs -> prefs[stringPreferencesKey("ebusiness_id")] = value }
+        context.dataStore.edit { prefs -> prefs[EBUSINESS_ID_KEY] = value }
     }
 
     fun getAppKey(context: Context): String? {
         return runBlocking {
-            context.dataStore.data.first()[stringPreferencesKey("app_key")]
+            context.dataStore.data.first()[APP_KEY_KEY]
         }
     }
 
     suspend fun setAppKey(context: Context, value: String) {
-        context.dataStore.edit { prefs -> prefs[stringPreferencesKey("app_key")] = value }
+        context.dataStore.edit { prefs -> prefs[APP_KEY_KEY] = value }
     }
 }

@@ -18,6 +18,8 @@ import com.pickuphelper.domain.model.Trace
  *   JD004 — ARRIVED but NO pickup code (non-Cainiao platform)
  *   EMS005 — NO_TRACE (no logistics info found)
  *   EMS006 — EXCEPTION (package problem)
+ *
+ * Note: receiverPhone is ignored in mock mode.
  */
 class MockProvider : PickupProvider {
 
@@ -30,7 +32,11 @@ class MockProvider : PickupProvider {
         "EMS006" to makeException()
     )
 
-    override suspend fun query(waybillNo: String, shipperCode: String?): PickupResult {
+    override suspend fun query(
+        waybillNo: String,
+        shipperCode: String?,
+        receiverPhone: String?
+    ): PickupResult {
         val sample = samples[waybillNo.uppercase()]
         return if (sample != null) {
             sample
@@ -170,5 +176,3 @@ class MockProvider : PickupProvider {
         )
     }
 }
-
-

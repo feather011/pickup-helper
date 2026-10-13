@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.pickuphelper.data.local.AppDatabase
 import com.pickuphelper.data.local.ParcelEntity
+import com.pickuphelper.data.provider.ProviderConfig
 import com.pickuphelper.data.provider.ProviderManager
 import com.pickuphelper.domain.model.FailureType
 import com.pickuphelper.domain.model.Status
@@ -83,8 +84,11 @@ class FloatingViewModel(application: Application) : AndroidViewModel(application
         val context = getApplication<Application>()
         val shipperCode = ShipperCodeDetector.detect(waybillNo)
         val shipperName = shipperCode?.let { ShipperCodeDetector.detectWithName(waybillNo)?.second } ?: "未知快递"
+        // 收件人手机号（Kuaidi100 取件码接口硬要求）
+        val receiverPhone = ProviderConfig.getReceiverPhone(context)
+
         try {
-            val result = provider.query(waybillNo, shipperCode)
+            val result = provider.query(waybillNo, shipperCode, receiverPhone)
             if (result.failure != null) {
                 val msg = when (result.failure.type) {
                     FailureType.NETWORK_ERROR -> "网络连接失败，请检查网络后重试"

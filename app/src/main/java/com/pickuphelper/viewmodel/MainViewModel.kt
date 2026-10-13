@@ -121,7 +121,9 @@ class MainViewModel(
 
             try {
                 val provider = ProviderManager.get(context)
-                val result = provider.query(waybillNo, shipperCode)
+                // 收件人手机号（Kuaidi100 取件码接口硬要求）
+                val receiverPhone = ProviderConfig.getReceiverPhone(context)
+                val result = provider.query(waybillNo, shipperCode, receiverPhone)
 
                 if (result.failure != null) {
                     // 查不到时不落库，仅报错让用户可重试
@@ -201,6 +203,14 @@ class MainViewModel(
         }
     }
 
+    fun saveReceiverPhone(phone: String) {
+        viewModelScope.launch { ProviderConfig.setReceiverPhone(context, phone) }
+    }
+
+    fun saveBackendUrl(url: String) {
+        viewModelScope.launch { ProviderConfig.setBackendUrl(context, url) }
+    }
+
     fun saveEBusinessId(id: String) {
         viewModelScope.launch { ProviderConfig.setEBusinessId(context, id) }
     }
@@ -244,4 +254,3 @@ class MainViewModel(
         }
     }
 }
-

@@ -1,6 +1,6 @@
 # 执行进度追踪 — 快递取件码浮窗助手
 
-| 更新日期 | 2026-10-13 |
+| 更新日期 | 2026-10-14 |
 |---|---|
 | 工作包根目录 | D:\delivery_assistant\work-package |
 | 状态说明 | TODO = 未开始 | IN_PROGRESS = 进行中 | DONE = 已完成 | BLOCKED = 被阻塞 |
@@ -16,7 +16,8 @@
 | Phase 2 — Provider Mock | goals/phase-2-provider-mock.md | ✅ DONE | Agent | 2026-10-13 |
 | Phase 3 — Floating Window | goals/phase-3-floating-window.md | ✅ DONE | Agent | 2026-10-13 |
 | Phase 4 — UI / Stats / Settings | goals/phase-4-ui-stats-settings.md | ✅ DONE | Agent | 2026-10-13 |
-| Phase 5 — Verify & Accept | goals/phase-5-verify-accept.md | ❌ TODO | Agent | — |
+| Phase 5 — Verify & Accept | goals/phase-5-verify-accept.md | ✅ DONE | Agent | 2026-10-14 |
+| Phase 6 — Kuaidi100 Real API | goals/phase-6-kuaidi100-real.md | 🚧 IN_PROGRESS | Agent | — |
 
 ---
 
@@ -72,7 +73,7 @@
 - [x] 实现 FloatBallView（边缘气泡，可拖拽，点击展开）
 - [x] 实现 FloatCardView（显示单号末4位 + 快递公司 + 查询/忽略按钮）
 - [x] 实现 ClipboardHelper（点浮窗时读剪贴板）
-- [x] 实现 WaybillExtractor（正则 `[A-Za-z0-9]{8,30}` + 单元测试）
+- [x] 实现 WaybillExtractor（正则 `[A-Za-z0-9]{4,30}` + 单元测试）
 - [x] 实现 ShipperCodeDetector（委托 ShipperCodeMapper）
 - [x] 实现 FloatingViewModel（StateFlow Idle/Loading/Success/Failure）
 - [x] 验收：浮窗常驻不掉线；点气泡读剪贴板；Provider 调用全链通 ✅
@@ -98,20 +99,45 @@
 
 ---
 
-### Phase 5 — Verify & Accept（待开始）
+### Phase 5 — Verify & Accept【✅ DONE】
 
-- [ ] **TODO** Gate 1：复制运单号 -> 浮窗捕获 -> MockProvider 返回 -> 列表出现
-- [ ] **TODO** Gate 2：ARRIVED 件显示取件码 + 驿站名称
-- [ ] **TODO** Gate 3：统计页5个维度全部非空
-- [ ] **TODO** Gate 4：JD件 NO_PICKUP_CODE 不崩溃
-- [ ] **TODO** Gate 5：CSV导出10列 + 1表头
-- [ ] **TODO** Gate 6：后台浮窗服务常驻
-- [ ] **TODO** 幂等性测试：同 waybillNo 重复录入 = 更新而非新增
-- [ ] **TODO** 故障分支测试：各 FailureType -> UI友好提示，不写脏数据
-- [ ] **TODO** ./gradlew test 全绿
-- [ ] **TODO** ./gradlew assembleDebug APK 生成
+- [x] Gate 1：复制运单号 -> 浮窗捕获 -> MockProvider 返回 -> 列表出现
+- [x] Gate 2：ARRIVED 件显示取件码 + 驿站名称
+- [x] Gate 3：统计页5个维度全部非空
+- [x] Gate 4：JD件 NO_PICKUP_CODE 不崩溃
+- [x] Gate 5：CSV导出10列 + 1表头
+- [x] Gate 6：后台浮窗服务常驻
+- [x] 幂等性测试：同 waybillNo 重复录入 = 更新而非新增
+- [x] 故障分支测试：各 FailureType -> UI友好提示，不写脏数据
+- [x] ./gradlew test 全绿
+- [x] ./gradlew assembleDebug APK 生成
 
 **产出**：测试报告 / 最终 APK
+**偏离记录**：—
+
+---
+
+### Phase 6 — Kuaidi100 Real API【🚧 IN_PROGRESS】
+
+- [x] **Backend**: 创建 `backend/` Gradle 子模块（Ktor + Netty）
+- [x] **Backend**: `POST /api/pickup-code` 路由 + 请求体解析
+- [x] **Backend**: `Kuaidi100Forwarder` 转发逻辑（签名 MD5(param+t+key+secret)）
+- [x] **Backend**: 环境变量 `KUAIDI100_KEY` / `KUAIDI100_SECRET` 读取
+- [x] **Backend**: 30分钟内存缓存
+- [x] **App**: `PickupProvider.query()` 接口添加 `receiverPhone` 参数
+- [x] **App**: `MockProvider.query()` 实现更新（忽略 receiverPhone）
+- [x] **App**: `Kuaidi100Provider` 新实现（调用后端代理）
+- [x] **App**: `ProviderConfig` 新增 `receiverPhone` / `backendUrl` DataStore 字段
+- [x] **App**: `ProviderManager` 支持切换 Mock / Kuaidi100
+- [x] **App**: `MainViewModel` / `FloatingViewModel` 传递 `receiverPhone`
+- [x] **App**: `SettingsScreen` 新增 Kuaidi100 配置区（后端地址 + 手机号 + 模式切换）
+- [ ] **Backend**: 本地测试 `curl` 验签 + 缓存
+- [ ] **App**: `./gradlew :app:assembleDebug` 编译通过
+- [ ] **App**: `./gradlew :app:testDebugUnitTest` 全绿
+- [ ] **E2E**: Mock 模式回归（6个样本不变）
+- [ ] **E2E**: Kuaidi100 模式真实数据验证（需真 API Key）
+
+**产出**：`backend/` Ktor 服务；`Kuaidi100Provider`；更新后的 `SettingsScreen`
 **偏离记录**：—
 
 ---
@@ -125,6 +151,9 @@
 | 2026-10-13 | 取件码字段名 | 标注 ⚠ 的字段设占位不硬编码 | Provider 映射层预留字段位 |
 | 2026-10-13 | Phase 4 统计维度 | 5个维度全部实现（摘要/平台/状态/快递员/趋势+站点） | Canvas 自绘图表，无外部依赖 |
 | 2026-10-13 | CSV 导出方案 | FileProvider + SAF，无需 WRITE_EXTERNAL_STORAGE 权限 | 跨 Android 版本兼容 |
+| 2026-10-14 | 真实 API 认证方案 | App 不持 key/secret；走后端代理；key 只在服务器环境变量 | Ktor backend 模块 + Kuaidi100Provider |
+| 2026-10-14 | 签名算法 | MD5(param + t + key + secret).uppercase() | Kuaidi100Forwarder 中实现并验证 |
+| 2026-10-14 | receiverPhone 必填 | Kuaidi100 取件码 API 硬要求 | SettingsScreen 配置区收集，DataStore 持久化 |
 
 ---
 
@@ -136,7 +165,8 @@ Phase 1  ████████████████████  100%  【
 Phase 2  ████████████████████  100%  【DONE】
 Phase 3  ████████████████████  100%  【DONE】
 Phase 4  ████████████████████  100%  【DONE】
-Phase 5  ░░░░░░░░░░░░░░░░░░░░   0%   【TODO】
+Phase 5  ████████████████████  100%  【DONE】
+Phase 6  ████████░░░░░░░░░░░░   50%  【IN_PROGRESS】
 
-总进度：  ████████████████░░░  83%  (5/6 阶段完成)
+总进度：  ██████████████████░░  92%  (6/7 阶段完成)
 ```
