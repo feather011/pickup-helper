@@ -49,8 +49,8 @@ class FloatingWindowService : LifecycleService() {
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(CHANNEL_ID, "浮窗服务", NotificationManager.IMPORTANCE_LOW).apply {
-                description = "快递取件码浮窗助手常驻服务"
+            val channel = NotificationChannel(CHANNEL_ID, "float window service", NotificationManager.IMPORTANCE_LOW).apply {
+                description = "pickup helper floating service"
                 setShowBadge(false)
             }
             getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
@@ -60,8 +60,8 @@ class FloatingWindowService : LifecycleService() {
     private fun buildNotification(): Notification {
         val pendingIntent = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("快递取件码浮窗")
-            .setContentText("点击查看或管理浮窗")
+            .setContentTitle("pickup helper")
+            .setContentText("tap to manage")
             .setSmallIcon(android.R.drawable.ic_menu_send)
             .setContentIntent(pendingIntent).setOngoing(true).build()
     }
@@ -86,10 +86,12 @@ class FloatingWindowService : LifecycleService() {
 
     private fun showCard() {
         if (cardView != null) return
-        val card = FloatCardView(this, { viewModel.collapse(); viewModel.reset() }) {
-            viewModel.collapse(); viewModel.reset()
-            startActivity(Intent(this, MainActivity::class.java).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP })
-        }
+        val card = FloatCardView(
+            this,
+            { viewModel.collapse(); viewModel.reset() },
+            { viewModel.collapse(); viewModel.reset(); startActivity(Intent(this, MainActivity::class.java).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP }) },
+            { waybillNo -> viewModel.queryManual(waybillNo) }
+        )
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT, WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
@@ -97,7 +99,7 @@ class FloatingWindowService : LifecycleService() {
         ).apply { gravity = Gravity.CENTER_HORIZONTAL or Gravity.CENTER_VERTICAL }
         windowManager.addView(card, params)
         cardView = card
-        card.update(FloatingUiState.Loading)
+        card.update(FloatingUiState.Idle)
     }
 
     private fun hideCard() {

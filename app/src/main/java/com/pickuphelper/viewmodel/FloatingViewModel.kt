@@ -45,52 +45,64 @@ class FloatingViewModel(application: Application) : AndroidViewModel(application
             val context = getApplication<Application>()
             val clipboardText = ClipboardHelper.readOnce(context)
             if (clipboardText == null) {
-                _uiState.value = FloatingUiState.Failure("剪贴板为空或无权限")
+                _uiState.value = FloatingUiState.Failure("clipboard empty or no permission")
                 return@launch
             }
             val waybillNo = WaybillExtractor.extract(clipboardText)
             if (waybillNo == null) {
-                _uiState.value = FloatingUiState.Failure("未检测到有效运单号（需4-30位字母数字）")
+                _uiState.value = FloatingUiState.Failure("no valid waybill found in clipboard (need 4-30 alphanumeric)")
                 return@launch
             }
-            val shipperCode = ShipperCodeDetector.detect(waybillNo)
-            val shipperName = shipperCode?.let { ShipperCodeDetector.detectWithName(waybillNo)?.second } ?: "未知快递"
-            try {
-                val result = provider.query(waybillNo, shipperCode)
-                if (result.failure != null) {
-                    val msg = when (result.failure.type) {
-                        FailureType.NETWORK_ERROR -> "网络连接失败，请检查网络后重试"
-                        FailureType.TIMEOUT -> "查询超时，请稍后重试"
-                        FailureType.NO_TRACE -> "未找到该单号的物流信息，请确认单号是否正确"
-                        FailureType.INVALID_WAYBILL -> "单号格式不正确，请确认后重试"
-                        FailureType.PERMISSION_DENIED -> "权限不足，请检查设置"
-                        else -> "未找到该单号的取件信息，请确认单号是否正确"
-                    }
-                    _uiState.value = FloatingUiState.Failure(msg)
-                    return@launch
+            queryWaybill(waybillNo)
+        }
+    }
+
+    fun queryManual(waybillNo: String) {
+        viewModelScope.launch {
+            _uiState.value = FloatingUiState.Loading
+            queryWaybill(waybillNo.trim())
+        }
+    }
+
+    private suspend fun queryWaybill(waybillNo: String) {
+        val context = getApplication<Application>()
+        val shipperCode = ShipperCodeDetector.detect(waybillNo)
+        val shipperName = shipperCode?.let { ShipperCodeDetector.detectWithName(waybillNo)?.second } ?: "unknown shipper"
+        try {
+            val result = provider.query(waybillNo, shipperCode)
+            if (result.failure != null) {
+                val msg = when (result.failure.type) {
+                    FailureType.NETWORK_ERROR -> "network error, please check connection"
+                    FailureType.TIMEOUT -> "query timeout, please retry"
+                    FailureType.NO_TRACE -> "no logistics info found, please verify waybill"
+                    FailureType.INVALID_WAYBILL -> "invalid waybill format"
+                    FailureType.PERMISSION_DENIED -> "permission denied"
+                    else -> "waybill not found, please confirm"
                 }
-                val parcel = result.parcel!!
-                dao.upsert(ParcelEntity.fromDomain(parcel))
-                val statusText = when (parcel.status) {
-                    Status.ARRIVED -> "已到站"
-                    Status.IN_TRANSIT -> "运输中"
-                    Status.SIGNED -> "已签收"
-                    Status.COLLECTED -> "已揽收"
-                    Status.EXCEPTION -> "异常"
-                    Status.NO_TRACE -> "暂无轨迹"
-                }
-                _uiState.value = FloatingUiState.Success(
-                    waybillNo = waybillNo,
-                    shipperName = shipperName,
-                    statusText = statusText,
-                    pickupCode = parcel.pickupCode,
-                    stationName = parcel.stationName,
-                    lastTrace = parcel.latestTrace ?: ""
-                )
-                ClipboardHelper.clear(context)
-            } catch (e: Exception) {
-                _uiState.value = FloatingUiState.Failure("查询失败：${e.message}")
+                _uiState.value = FloatingUiState.Failure(msg)
+                return
             }
+            val parcel = result.parcel!!
+            dao.upsert(ParcelEntity.fromDomain(parcel))
+            val statusText = when (parcel.status) {
+                Status.ARRIVED -> "arrived"
+                Status.IN_TRANSIT -> "in transit"
+                Status.SIGNED -> "signed"
+                Status.COLLECTED -> "collected"
+                Status.EXCEPTION -> "exception"
+                Status.NO_TRACE -> "no trace"
+            }
+            _uiState.value = FloatingUiState.Success(
+                waybillNo = waybillNo,
+                shipperName = shipperName,
+                statusText = statusText,
+                pickupCode = parcel.pickupCode,
+                stationName = parcel.stationName,
+                lastTrace = parcel.latestTrace ?: ""
+            )
+            ClipboardHelper.clear(context)
+        } catch (e: Exception) {
+            _uiState.value = FloatingUiState.Failure("query failed: " + e.message)
         }
     }
 

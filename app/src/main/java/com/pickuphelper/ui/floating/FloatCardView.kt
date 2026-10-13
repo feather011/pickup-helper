@@ -8,15 +8,21 @@ import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
 import android.widget.Button
+import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.pickuphelper.viewmodel.FloatingUiState
 
 @SuppressLint("InflateParams")
-class FloatCardView(context: Context, private val onDismiss: () -> Unit, private val onOpenApp: () -> Unit) : FrameLayout(context) {
+class FloatCardView(
+    context: Context,
+    private val onDismiss: () -> Unit,
+    private val onOpenApp: () -> Unit,
+    private val onQueryManual: (String) -> Unit
+) : FrameLayout(context) {
     private val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
-    // Bug3 fix: white rounded card background using GradientDrawable (no theme)
+
     private val cardBackground = GradientDrawable().apply {
         shape = GradientDrawable.RECTANGLE
         cornerRadius = dpToPx(16).toFloat()
@@ -24,7 +30,6 @@ class FloatCardView(context: Context, private val onDismiss: () -> Unit, private
         setElevation(12f)
     }
 
-    // Wrapper FrameLayout with card background + padding
     private val cardWrapper = FrameLayout(context).apply {
         background = cardBackground
         layoutParams = LayoutParams(dpToPx(300), LayoutParams.WRAP_CONTENT)
@@ -38,39 +43,113 @@ class FloatCardView(context: Context, private val onDismiss: () -> Unit, private
             layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
         }
         when (state) {
-            is FloatingUiState.Loading -> content.addView(TextView(context).apply { text = "查询中..."; textSize = 16f; setTextColor(Color.DKGRAY) })
+            is FloatingUiState.Loading -> content.addView(TextView(context).apply { text = "query in progress..."; textSize = 16f; setTextColor(Color.DKGRAY) })
             is FloatingUiState.Success -> buildSuccess(content, state)
             is FloatingUiState.Failure -> buildFailure(content, state.message)
-            FloatingUiState.Idle -> {}
+            FloatingUiState.Idle -> buildIdle(content)
         }
         cardWrapper.addView(content)
     }
 
+    private fun buildIdle(content: LinearLayout) {
+        val ctx = context
+        content.addView(TextView(ctx).apply {
+            text = "\uD83D\uDCE6 query pickup code"
+            textSize = 15f
+            setTextColor(Color.parseColor("#333333"))
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+        })
+        spacer(content, 8)
+        val input = EditText(ctx).apply {
+            hint = "enter waybill no"
+            textSize = 14f
+            layoutParams = LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply {
+                bottomMargin = dpToPx(8)
+            }
+            setPadding(dpToPx(8), dpToPx(8), dpToPx(8), dpToPx(8))
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = dpToPx(8).toFloat()
+                setColor(Color.parseColor("#F5F5F5"))
+            }
+        }
+        content.addView(input)
+        spacer(content, 8)
+        val row = LinearLayout(ctx).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
+            gravity = Gravity.END
+        }
+        row.addView(Button(ctx).apply { text = "cancel"; setOnClickListener { onDismiss() } })
+        spacerH(row, 8)
+        row.addView(Button(ctx).apply {
+            text = "query"
+            setOnClickListener {
+                val text = input.text.toString().trim()
+                if (text.isNotEmpty()) {
+                    onQueryManual(text)
+                }
+            }
+        })
+        content.addView(row)
+    }
+
     private fun buildSuccess(content: LinearLayout, s: FloatingUiState.Success) {
         val ctx = context
-        content.addView(TextView(ctx).apply { text = "运单尾号: " + s.waybillNo.takeLast(4) + "  |  " + s.shipperName; textSize = 14f; setTextColor(Color.parseColor("#555555")) })
+        content.addView(TextView(ctx).apply { text = "waybill: " + s.waybillNo.takeLast(4) + "  |  " + s.shipperName; textSize = 14f; setTextColor(Color.parseColor("#555555")) })
         spacer(content, 8)
-        val statusTxt = if (s.pickupCode != null) "\u2705 " + s.statusText + "  取件码: " + s.pickupCode else "\uD83D\uDCCB " + s.statusText
+        val statusTxt = if (s.pickupCode != null) "\u2705 " + s.statusText + "  code: " + s.pickupCode else "\uD83D\uDCCB " + s.statusText
         content.addView(TextView(ctx).apply { text = statusTxt; textSize = 16f; setTextColor(Color.BLACK); typeface = android.graphics.Typeface.DEFAULT_BOLD })
         s.stationName?.let { spacer(content, 4); content.addView(TextView(ctx).apply { text = "\uD83D\uDCCD " + it; textSize = 13f; setTextColor(Color.parseColor("#666666")) }) }
         if (s.lastTrace.isNotBlank()) { spacer(content, 4); content.addView(TextView(ctx).apply { text = s.lastTrace; textSize = 12f; setTextColor(Color.parseColor("#888888")); maxLines = 2 }) }
         spacer(content, 12)
         val row = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL; layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT) }
-        // Bug3 fix: use standard android.widget.Button instead of MaterialButton
-        row.addView(Button(ctx).apply { text = "忽略"; setOnClickListener { onDismiss() } })
-        row.addView(Button(ctx).apply { text = "查看详情"; setOnClickListener { onOpenApp() } })
+        row.addView(Button(ctx).apply { text = "dismiss"; setOnClickListener { onDismiss() } })
+        row.addView(Button(ctx).apply { text = "detail"; setOnClickListener { onOpenApp() } })
         content.addView(row)
     }
 
     private fun buildFailure(content: LinearLayout, msg: String) {
         val ctx = context
-        content.addView(TextView(ctx).apply { text = "\u274C 查询失败"; textSize = 16f; setTextColor(Color.RED) })
+        content.addView(TextView(ctx).apply { text = "\u274C query failed"; textSize = 16f; setTextColor(Color.RED) })
         spacer(content, 4)
         content.addView(TextView(ctx).apply { text = msg; textSize = 13f; setTextColor(Color.DKGRAY); maxLines = 3 })
         spacer(content, 12)
-        content.addView(Button(ctx).apply { text = "关闭"; setOnClickListener { onDismiss() } })
+        val input = EditText(ctx).apply {
+            hint = "retry waybill no"
+            textSize = 14f
+            layoutParams = LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply {
+                bottomMargin = dpToPx(8)
+            }
+            setPadding(dpToPx(8), dpToPx(8), dpToPx(8), dpToPx(8))
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = dpToPx(8).toFloat()
+                setColor(Color.parseColor("#F5F5F5"))
+            }
+        }
+        content.addView(input)
+        spacer(content, 8)
+        val row = LinearLayout(ctx).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
+            gravity = Gravity.END
+        }
+        row.addView(Button(ctx).apply { text = "close"; setOnClickListener { onDismiss() } })
+        spacerH(row, 8)
+        row.addView(Button(ctx).apply {
+            text = "retry"
+            setOnClickListener {
+                val text = input.text.toString().trim()
+                if (text.isNotEmpty()) {
+                    onQueryManual(text)
+                }
+            }
+        })
+        content.addView(row)
     }
 
     private fun spacer(parent: LinearLayout, h: Int) { parent.addView(View(context).apply { layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, dpToPx(h)) }) }
+    private fun spacerH(parent: LinearLayout, w: Int) { parent.addView(View(context).apply { layoutParams = LayoutParams(dpToPx(w), LayoutParams.WRAP_CONTENT) }) }
     private fun dpToPx(dp: Int) = (dp * context.resources.displayMetrics.density).toInt()
 }
