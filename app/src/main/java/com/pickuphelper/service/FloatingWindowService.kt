@@ -96,7 +96,11 @@ class FloatingWindowService : LifecycleService() {
             WindowManager.LayoutParams.WRAP_CONTENT, WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL, PixelFormat.TRANSLUCENT
-        ).apply { gravity = Gravity.CENTER_HORIZONTAL or Gravity.CENTER_VERTICAL }
+        ).apply {
+            gravity = Gravity.CENTER_HORIZONTAL or Gravity.CENTER_VERTICAL
+            // 关键：可聚焦浮窗默认会被软键盘 insets 撑满全屏，必须 ADJUST_NOTHING，卡片高度才按内容自适应
+            softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING
+        }
         windowManager.addView(card, params)
         cardView = card
         card.update(FloatingUiState.Idle)

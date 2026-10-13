@@ -23,6 +23,18 @@ class FloatCardView(
 ) : FrameLayout(context) {
     private val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
 
+    /** 卡片最大高度（dp）：防止可聚焦浮窗被软键盘 insets 撑满全屏 */
+    private val maxCardHeight = dpToPx(400)
+
+    init {
+        layoutParams = LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT)
+    }
+
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        val cappedHeight = MeasureSpec.makeMeasureSpec(maxCardHeight, MeasureSpec.AT_MOST)
+        super.onMeasure(widthMeasureSpec, cappedHeight)
+    }
+
     private val cardBackground = GradientDrawable().apply {
         shape = GradientDrawable.RECTANGLE
         cornerRadius = dpToPx(16).toFloat()
@@ -40,7 +52,10 @@ class FloatCardView(
         cardWrapper.removeAllViews()
         val content = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
-            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
         }
         when (state) {
             is FloatingUiState.Loading -> content.addView(TextView(context).apply { text = "query in progress..."; textSize = 16f; setTextColor(Color.DKGRAY) })
@@ -59,13 +74,13 @@ class FloatCardView(
             setTextColor(Color.parseColor("#333333"))
             typeface = android.graphics.Typeface.DEFAULT_BOLD
         })
-        spacer(content, 8)
         val input = EditText(ctx).apply {
             hint = "enter waybill no"
             textSize = 14f
-            layoutParams = LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply {
-                bottomMargin = dpToPx(8)
-            }
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { bottomMargin = dpToPx(8) }
             setPadding(dpToPx(8), dpToPx(8), dpToPx(8), dpToPx(8))
             background = GradientDrawable().apply {
                 shape = GradientDrawable.RECTANGLE
@@ -74,16 +89,23 @@ class FloatCardView(
             }
         }
         content.addView(input)
-        spacer(content, 8)
         val row = LinearLayout(ctx).apply {
             orientation = LinearLayout.HORIZONTAL
-            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
             gravity = Gravity.END
         }
-        row.addView(Button(ctx).apply { text = "cancel"; setOnClickListener { onDismiss() } })
+        row.addView(Button(ctx).apply {
+            text = "cancel"
+            layoutParams = LinearLayout.LayoutParams(dpToPx(96), dpToPx(44))
+            setOnClickListener { onDismiss() }
+        })
         spacerH(row, 8)
         row.addView(Button(ctx).apply {
             text = "query"
+            layoutParams = LinearLayout.LayoutParams(dpToPx(96), dpToPx(44))
             setOnClickListener {
                 val text = input.text.toString().trim()
                 if (text.isNotEmpty()) {
@@ -103,24 +125,38 @@ class FloatCardView(
         s.stationName?.let { spacer(content, 4); content.addView(TextView(ctx).apply { text = "\uD83D\uDCCD " + it; textSize = 13f; setTextColor(Color.parseColor("#666666")) }) }
         if (s.lastTrace.isNotBlank()) { spacer(content, 4); content.addView(TextView(ctx).apply { text = s.lastTrace; textSize = 12f; setTextColor(Color.parseColor("#888888")); maxLines = 2 }) }
         spacer(content, 12)
-        val row = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL; layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT) }
-        row.addView(Button(ctx).apply { text = "dismiss"; setOnClickListener { onDismiss() } })
-        row.addView(Button(ctx).apply { text = "detail"; setOnClickListener { onOpenApp() } })
+        val row = LinearLayout(ctx).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        }
+        row.addView(Button(ctx).apply {
+            text = "dismiss"
+            layoutParams = LinearLayout.LayoutParams(dpToPx(96), dpToPx(44))
+            setOnClickListener { onDismiss() }
+        })
+        row.addView(Button(ctx).apply {
+            text = "detail"
+            layoutParams = LinearLayout.LayoutParams(dpToPx(96), dpToPx(44))
+            setOnClickListener { onOpenApp() }
+        })
         content.addView(row)
     }
 
     private fun buildFailure(content: LinearLayout, msg: String) {
         val ctx = context
         content.addView(TextView(ctx).apply { text = "\u274C query failed"; textSize = 16f; setTextColor(Color.RED) })
-        spacer(content, 4)
         content.addView(TextView(ctx).apply { text = msg; textSize = 13f; setTextColor(Color.DKGRAY); maxLines = 3 })
         spacer(content, 12)
         val input = EditText(ctx).apply {
             hint = "retry waybill no"
             textSize = 14f
-            layoutParams = LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply {
-                bottomMargin = dpToPx(8)
-            }
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { bottomMargin = dpToPx(8) }
             setPadding(dpToPx(8), dpToPx(8), dpToPx(8), dpToPx(8))
             background = GradientDrawable().apply {
                 shape = GradientDrawable.RECTANGLE
@@ -129,16 +165,23 @@ class FloatCardView(
             }
         }
         content.addView(input)
-        spacer(content, 8)
         val row = LinearLayout(ctx).apply {
             orientation = LinearLayout.HORIZONTAL
-            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
             gravity = Gravity.END
         }
-        row.addView(Button(ctx).apply { text = "close"; setOnClickListener { onDismiss() } })
+        row.addView(Button(ctx).apply {
+            text = "close"
+            layoutParams = LinearLayout.LayoutParams(dpToPx(96), dpToPx(44))
+            setOnClickListener { onDismiss() }
+        })
         spacerH(row, 8)
         row.addView(Button(ctx).apply {
             text = "retry"
+            layoutParams = LinearLayout.LayoutParams(dpToPx(96), dpToPx(44))
             setOnClickListener {
                 val text = input.text.toString().trim()
                 if (text.isNotEmpty()) {
@@ -149,7 +192,21 @@ class FloatCardView(
         content.addView(row)
     }
 
-    private fun spacer(parent: LinearLayout, h: Int) { parent.addView(View(context).apply { layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, dpToPx(h)) }) }
-    private fun spacerH(parent: LinearLayout, w: Int) { parent.addView(View(context).apply { layoutParams = LayoutParams(dpToPx(w), LayoutParams.WRAP_CONTENT) }) }
+    /** 垂直间隔：用 LinearLayout.LayoutParams 的 topMargin，避免 FrameLayout.LayoutParams 语义歧义 */
+    private fun spacer(parent: LinearLayout, h: Int) {
+        parent.addView(View(context).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dpToPx(h)
+            )
+        })
+    }
+
+    /** 水平按钮间隔 */
+    private fun spacerH(parent: LinearLayout, w: Int) {
+        parent.addView(View(context).apply {
+            layoutParams = LinearLayout.LayoutParams(dpToPx(w), dpToPx(1))
+        })
+    }
     private fun dpToPx(dp: Int) = (dp * context.resources.displayMetrics.density).toInt()
 }
