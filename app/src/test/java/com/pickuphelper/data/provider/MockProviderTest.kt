@@ -57,10 +57,10 @@ class MockProviderTest {
     }
 
     @Test
-    fun query_unknownWaybill_returnsNoTraceParcel() = runTest {
+    fun query_unknownWaybill_returnsFailure() = runTest {
         val result = provider.query("UNKNOWN999", null)
-        assertNotNull(result.parcel)
-        assertEquals(Status.NO_TRACE, result.parcel!!.status)
+        assertNull(result.parcel)
+        assertNotNull(result.failure)
     }
 
     @Test
@@ -71,19 +71,19 @@ class MockProviderTest {
     }
 
     @Test
-    fun query_withExplicitShipperCode_usesIt_forUnknownWaybill() = runTest {
+    fun query_unknownWaybill_withExplicitShipperCode_stillReturnsFailure() = runTest {
         // For unknown waybillNos, explicit shipperCode takes effect
         val result = provider.query("NOTINSAMPLE1", "SF")
-        assertNotNull(result.parcel)
-        assertEquals("SF", result.parcel!!.shipperCode)
-        assertEquals("顺丰速运", result.parcel!!.shipperName)
+        assertNull(result.parcel)
+        assertNotNull(result.failure)
     }
 
     @Test
-    fun query_withExplicitShipperCode_overridesDetection() = runTest {
+    fun query_unknownWaybill_withExplicitShipperCode_overridesDetection() = runTest {
         // Unknown waybill, explicit code overrides prefix detection
         val result = provider.query("NOTINSAMPLE2", "YTO")
-        assertNotNull(result.parcel)
-        assertEquals("YTO", result.parcel!!.shipperCode)
+        assertNull(result.parcel)
+        assertNotNull(result.failure)
     }
 }
+

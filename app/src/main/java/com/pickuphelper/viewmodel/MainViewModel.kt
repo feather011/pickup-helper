@@ -116,13 +116,7 @@ class MainViewModel(
                 val result = provider.query(waybillNo, shipperCode)
 
                 if (result.failure != null) {
-                    val entity = ParcelEntity(
-                        waybillNo = waybillNo, shipperCode = shipperCode ?: "",
-                        shipperName = shipperName, platform = platform,
-                        status = Status.NO_TRACE.value, latestTrace = null,
-                        createdAt = now, updatedAt = now
-                    )
-                    database.parcelDao().upsert(entity)
+                    // 查不到时不落库，仅报错让用户可重试
                     _addParcelError.value = result.failure.message
                 } else {
                     val parcel = result.parcel!!
@@ -136,13 +130,7 @@ class MainViewModel(
                     _addParcelDialogVisible.value = false
                 }
             } catch (e: Exception) {
-                val entity = ParcelEntity(
-                    waybillNo = waybillNo, shipperCode = shipperCode ?: "",
-                    shipperName = shipperName, platform = platform,
-                    status = Status.NO_TRACE.value, latestTrace = null,
-                    createdAt = now, updatedAt = now
-                )
-                database.parcelDao().upsert(entity)
+                // 网络异常时不落库，仅报错
                 _addParcelError.value = "查询失败：${e.message}"
             } finally {
                 _isAddingParcel.value = false
@@ -225,3 +213,4 @@ class MainViewModel(
         }
     }
 }
+

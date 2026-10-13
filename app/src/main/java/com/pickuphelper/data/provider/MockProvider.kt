@@ -39,7 +39,7 @@ class MockProvider : PickupProvider {
             PickupResult(
                 parcel = null,
                 failure = Failure(
-                    type = FailureType.INVALID_WAYBILL,
+                    type = FailureType.UNKNOWN,
                     message = "未找到该单号的取件信息，请确认单号是否正确"
                 )
             )
@@ -170,4 +170,5 @@ class MockProvider : PickupProvider {
         )
     }
 }
+
 
