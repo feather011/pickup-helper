@@ -97,6 +97,13 @@ fun ParcelListScreen(vm: MainViewModel) {
         }
     }
 
+    LaunchedEffect(deleteSuccess) {
+        deleteSuccess?.let {
+            snackbarHostState.showSnackbar(it)
+            vm.clearDeleteSuccess()
+        }
+    }
+
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
