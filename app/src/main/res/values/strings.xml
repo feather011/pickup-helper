@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">取件码助手</string>
+    <string name="privacy_notice">隐私声明：运单号将被发送至快递鸟API进行物流查询，仅在本地存储，不会上传至任何第三方服务器。</string>
+    <string name="notification_channel_name">浮窗服务</string>
+    <string name="notification_channel_desc">保持取件码浮窗助手在后台运行</string>
+    <string name="notification_title">取件码浮窗助手</string>
+    <string name="notification_text">运行中</string>
+</resources>
