@@ -68,7 +68,8 @@ class FloatingWindowService : LifecycleService() {
 
     private fun showFloatingBall() {
         if (ballView != null) return
-        val ball = FloatBallView(this) { viewModel.onBallTapped(); viewModel.expand() }
+        // 只展开卡片：剡贴板读取必须等卡片创建并获得焦点后才能成功
+        val ball = FloatBallView(this) { viewModel.expand() }
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT, WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
@@ -103,7 +104,10 @@ class FloatingWindowService : LifecycleService() {
         }
         windowManager.addView(card, params)
         cardView = card
-        card.update(FloatingUiState.Idle)
+        // 用当前真实状态初始化，不硬编码 Idle，否则会覆盖已算出的结果
+        card.update(viewModel.uiState.value)
+        // 卡片窗口已可聚焦（FLAG_ALT_FOCUSABLE_IM），此时才能真正读到剪贴板
+        viewModel.queryClipboardIfAvailable()
     }
 
     private fun hideCard() {

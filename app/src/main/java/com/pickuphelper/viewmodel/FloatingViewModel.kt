@@ -39,6 +39,21 @@ class FloatingViewModel(application: Application) : AndroidViewModel(application
     private val _expanded = MutableStateFlow(false)
     val expanded: StateFlow<Boolean> = _expanded.asStateFlow()
 
+    /**
+     * 在卡片窗口已获得焦点后调用。
+     * Android 12+ 仅允许有焦点的应用读剪贴板，无内容/无合法单号时静默失败，
+     * 保留输入框让用户手动输入。
+     */
+    fun queryClipboardIfAvailable() {
+        viewModelScope.launch {
+            val context = getApplication<Application>()
+            val clipboardText = ClipboardHelper.readOnce(context) ?: return@launch
+            val waybillNo = WaybillExtractor.extract(clipboardText) ?: return@launch
+            queryWaybill(waybillNo)
+        }
+    }
+
+    @Deprecated("改用 expand() + queryClipboardIfAvailable()：需先创建可聚焦卡片才能读剪贴板")
     fun onBallTapped() {
         viewModelScope.launch {
             _uiState.value = FloatingUiState.Loading
