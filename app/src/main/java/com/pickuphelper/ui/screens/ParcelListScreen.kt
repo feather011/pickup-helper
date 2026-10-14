@@ -27,8 +27,9 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -211,18 +212,20 @@ private fun EmptyState(tabIndex: Int) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AddParcelDialog(isLoading: Boolean, onDismiss: () -> Unit, onConfirm: (String, String?) -> Unit) {
     var waybillNo by remember { mutableStateOf("") }; var expanded by remember { mutableStateOf(false) }; var selectedPlatform by remember { mutableStateOf<String?>(null) }
-    val platforms = listOf("圆通速递", "顺丰速运", "京东物流", "EMS", "菜鸟驿站")
+    // 真实快递公司中文名（与 ShipperCodeMapper.nameToCode 一一对应，去掉 XLA/菜鸟驿站）
+    val platforms = listOf("圆通速递", "顺丰速运", "中通快递", "韵达快递", "申通快递", "京东物流", "中国邮政EMS", "极兔速递", "宅急送", "天天快递")
     AlertDialog(
         onDismissRequest = { if (!isLoading) onDismiss() },
         title = { Text("添加包裹") },
         text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(value = waybillNo, onValueChange = { waybillNo = it.uppercase() }, label = { Text("运单号") }, singleLine = true, enabled = !isLoading, modifier = Modifier.fillMaxWidth())
-            Box {
-                OutlinedTextField(value = selectedPlatform ?: "自动识别", onValueChange = {}, label = { Text("快递公司") }, readOnly = true, enabled = !isLoading, modifier = Modifier.fillMaxWidth().clickable { expanded = true })
-                DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { if (!isLoading) expanded = !expanded }) {
+                OutlinedTextField(value = selectedPlatform ?: "自动识别", onValueChange = {}, readOnly = true, enabled = !isLoading, label = { Text("快递公司") }, trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) }, modifier = Modifier.fillMaxWidth().menuAnchor())
+                ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                     DropdownMenuItem(text = { Text("自动识别") }, onClick = { selectedPlatform = null; expanded = false })
                     platforms.forEach { p -> DropdownMenuItem(text = { Text(p) }, onClick = { selectedPlatform = p; expanded = false }) }
                 }

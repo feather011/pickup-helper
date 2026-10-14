@@ -118,8 +118,10 @@ class MainViewModel(
         viewModelScope.launch {
             val now = System.currentTimeMillis()
             // Prefix inference first; fallback to user-selected platform if detection fails
+            // 优先级：用户下拉框明确选择 > 前缀推断 > null（下拉选"自动识别"且前缀也推不出）
+            val userPickedCode = ShipperCodeDetector.fromChineseName(platform)
             val detectedCode = ShipperCodeDetector.detect(waybillNo)
-            val shipperCode = detectedCode ?: platform
+            val shipperCode = userPickedCode ?: detectedCode
             val shipperName = shipperCode?.let { ShipperCodeMapper.toChineseName(it) } ?: "未知快递"
 
             try {

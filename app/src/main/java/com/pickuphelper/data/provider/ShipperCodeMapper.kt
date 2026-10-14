@@ -60,6 +60,22 @@ object ShipperCodeMapper {
         return null
     }
 
+    /** 中文名 → 编码 的反向映射（用于下拉框兜底） */
+    private val nameToCode: Map<String, String> by lazy {
+        prefixMap.mapNotNull { e ->
+            if (e.code == "XLA") null else e.chineseName to e.code
+        }.toMap()
+    }
+
+    /**
+     * 通过中文名查编码（下拉框兜底）。找不到返回 null。
+     * 例如：fromChineseName("中通快递") -> "ZTO"
+     */
+    fun fromChineseName(chineseName: String?): String? {
+        if (chineseName.isNullOrBlank()) return null
+        return nameToCode[chineseName.trim()]
+    }
+
     /**
      * Convert a shipper code to its Chinese display name.
      */
