@@ -21,12 +21,12 @@ flowchart LR
         KP[Kuaidi100Provider<br/>真实实时查询]
     end
     subgraph Backend[Node.js Zero-Dep]
-        API[POST | /api/pickup-code]
+        API[POST<br/>/api/pickup-code]
         MD5[MD5 签名]
         CACHE[30 分钟缓存]
     end
     subgraph Kuaidi100[快递100]
-        RT[实时查询 API | poll.kuaidi100.com]
+        RT[实时查询 API<br/>poll.kuaidi100.com]
     end
     UI <--> VM <--> PM
     PM <-->|ACTIVE=mock| MP
