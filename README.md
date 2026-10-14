@@ -20,7 +20,7 @@ flowchart LR
         MP[MockProvider<br/>6 个样例数据]
         KP[Kuaidi100Provider<br/>真实实时查询]
     end
-    subgraph Backend[Node.js 后端 (零依赖)]
+    subgraph Backend[Node.js Zero-Dep]
         API[POST | /api/pickup-code]
         MD5[MD5 签名]
         CACHE[30 分钟缓存]
