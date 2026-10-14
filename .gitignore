@@ -35,4 +35,5 @@ acc_*.png
 _*.xml
 _*.py
 _*.ps1
-backend-node/
+backend-node/.env
+backend-node/node_modules/

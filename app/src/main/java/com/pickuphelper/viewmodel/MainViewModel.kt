@@ -19,6 +19,7 @@ import com.pickuphelper.domain.model.StatsSummary
 import com.pickuphelper.domain.model.Status
 import com.pickuphelper.domain.model.StatusCountDim
 import com.pickuphelper.service.ShipperCodeDetector
+import com.pickuphelper.data.provider.ShipperCodeMapper
 import com.pickuphelper.service.FloatingWindowService
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -116,8 +117,10 @@ class MainViewModel(
 
         viewModelScope.launch {
             val now = System.currentTimeMillis()
-            val shipperCode = ShipperCodeDetector.detect(waybillNo)
-            val shipperName = shipperCode?.let { ShipperCodeDetector.detectWithName(waybillNo)?.second } ?: "未知快递"
+            // Prefix inference first; fallback to user-selected platform if detection fails
+            val detectedCode = ShipperCodeDetector.detect(waybillNo)
+            val shipperCode = detectedCode ?: platform
+            val shipperName = shipperCode?.let { ShipperCodeMapper.toChineseName(it) } ?: "未知快递"
 
             try {
                 val provider = ProviderManager.get(context)
