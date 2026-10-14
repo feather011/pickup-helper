@@ -3,6 +3,7 @@ package com.pickuphelper.data.provider
 import android.content.Context
 import android.util.Log
 import com.google.gson.Gson
+import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import com.pickuphelper.domain.model.Failure
 import com.pickuphelper.domain.model.FailureType
@@ -111,6 +112,22 @@ class Kuaidi100Provider(private val context: Context) : PickupProvider {
      *   }]
      * }
      */
+    /** 安全获取字符串：处理 null / JsonNull / 非字符串 / 空值 */
+    private fun JsonElement?.safeString(): String? {
+        if (this == null || this.isJsonNull) return null
+        if (!this.isJsonPrimitive) return null
+        val prim = this.asJsonPrimitive
+        if (prim.isJsonNull) return null
+        return try { prim.asString.takeIf { it.isNotBlank() } } catch (e: Exception) { null }
+    }
+
+    /** 安全获取布尔：处理 null / JsonNull / 非布尔 */
+    private fun JsonElement?.safeBoolean(): Boolean? {
+        if (this == null || this.isJsonNull) return null
+        if (!this.isJsonPrimitive) return null
+        return try { this.asBoolean } catch (e: Exception) { null }
+    }
+
     @Suppress("UNCHECKED_CAST")
     private fun parseKuaidi100Response(
         json: String,
@@ -121,9 +138,9 @@ class Kuaidi100Provider(private val context: Context) : PickupProvider {
             val root = gson.fromJson(json, JsonObject::class.java)
 
             // 检查 result 字段
-            val result = root.get("result")?.asBoolean ?: false
+            val result = root.get("result").safeBoolean() ?: false
             if (!result) {
-                val message = root.get("message")?.asString ?: "未知错误"
+                val message = root.get("message").safeString() ?: "未知错误"
                 return makeError(FailureType.UNKNOWN, message)
             }
 
@@ -136,15 +153,15 @@ class Kuaidi100Provider(private val context: Context) : PickupProvider {
             val item = dataArray[0].asJsonObject
 
             // 提取字段
-            val code = item.get("LogisticCode")?.asString ?: waybillNo
-            val shipper = item.get("ShipperCode")?.asString ?: shipperCode ?: ""
-            val state = item.get("State")?.asString ?: "0"
-            val stateEx = item.get("StateEx")?.asString ?: ""
-            val pickupCode = item.get("PickupCode")?.asString?.takeIf { it.isNotBlank() }
-            val stationName = item.get("StationName")?.asString?.takeIf { it.isNotBlank() }
-            val stationAddress = item.get("StationAddress")?.asString?.takeIf { it.isNotBlank() }
+            val code = item.get("LogisticCode").safeString() ?: waybillNo
+            val shipper = item.get("ShipperCode").safeString() ?: shipperCode ?: ""
+            val state = item.get("State").safeString() ?: "0"
+            val stateEx = item.get("StateEx").safeString() ?: ""
+            val pickupCode = item.get("PickupCode").safeString()
+            val stationName = item.get("StationName").safeString()
+            val stationAddress = item.get("StationAddress").safeString()
             val latestTrace = item.getAsJsonArray("Traces")?.firstOrNull()
-                ?.asJsonObject?.get("AcceptStation")?.asString
+                ?.asJsonObject?.get("AcceptStation").safeString()
 
             // 映射状态
             val status = StatusMapper.mapFromKuaidiNiao(state, stateEx)
@@ -169,12 +186,12 @@ class Kuaidi100Provider(private val context: Context) : PickupProvider {
             // 构建 Trace 列表
             val traces = item.getAsJsonArray("Traces")?.mapIndexed { index, element ->
                 val trace = element.asJsonObject
-                val traceState = trace.get("State")?.asString ?: state
-                val traceStateEx = trace.get("StateEx")?.asString ?: stateEx
+                val traceState = trace.get("State").safeString() ?: state
+                val traceStateEx = trace.get("StateEx").safeString() ?: stateEx
                 Trace(
                     waybillNo = code,
-                    time = trace.get("AcceptTime")?.asString ?: "",
-                    station = trace.get("AcceptStation")?.asString ?: "",
+                    time = trace.get("AcceptTime").safeString() ?: "",
+                    station = trace.get("AcceptStation").safeString() ?: "",
                     action = StatusMapper.mapFromKuaidiNiao(traceState, traceStateEx)
                 )
             } ?: emptyList()

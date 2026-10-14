@@ -130,8 +130,9 @@ http.createServer(async (req, res) => {
       const cached = cacheGet(ckey);
       if (cached) { console.log("[CACHE HIT] " + waybillNo); res.writeHead(200, { "Content-Type": "application/json" }); res.end(JSON.stringify(cached)); return; }
       const appCode = normalizeAppCode(shipperCode);
+      let inferred = null;
       if (!appCode) {
-        const inferred = inferAppCode(waybillNo.trim());
+        inferred = inferAppCode(waybillNo.trim());
         if (!inferred) {
           res.writeHead(400, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ result: false, message: "cannot detect shipper, please select manually in app" }));

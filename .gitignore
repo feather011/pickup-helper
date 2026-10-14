@@ -37,3 +37,10 @@ _*.py
 _*.ps1
 backend-node/.env
 backend-node/node_modules/
+
+# Backend
+backend-node/.env
+backend-node/node_modules/
+backend-node/启动后端.bat
+backend-node/start-server.bat
+

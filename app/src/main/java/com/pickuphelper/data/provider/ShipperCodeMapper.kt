@@ -31,6 +31,7 @@ object ShipperCodeMapper {
         PrefixEntry("ZJ", "ZJS", "宅急送"),
         PrefixEntry("TT", "TT", "天天快递"),
         PrefixEntry("XL", "XLA", "新锐快递"),
+        PrefixEntry("JT", "JT", "极兔速递"),
         // Fallback — YTO as the default for YT-prefixed unknowns
         PrefixEntry("YT", "YTO", "圆通速递"),
     )

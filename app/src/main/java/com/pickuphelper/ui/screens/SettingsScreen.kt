@@ -5,6 +5,7 @@ import android.net.Uri
 import android.provider.Settings
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -62,6 +63,10 @@ fun SettingsScreen(vm: MainViewModel) {
     var privacyExpanded by remember { mutableStateOf(false) }
     var saveMessage by remember { mutableStateOf<String?>(null) }
 
+    // InteractionSource for OutlinedTextField (resolves focus/keyboard issues on some Compose versions)
+    val backendUrlInteraction = remember { MutableInteractionSource() }
+    val receiverPhoneInteraction = remember { MutableInteractionSource() }
+
     LaunchedEffect(Unit) {
         receiverPhone = ProviderConfig.getReceiverPhone(context) ?: ""
         backendUrl = ProviderConfig.getBackendUrl(context) ?: ""
@@ -110,32 +115,33 @@ fun SettingsScreen(vm: MainViewModel) {
                     Text(
                         text = if (floatingBallEnabled) "已开启 — 浮窗常驻桌面边缘" else "已关闭",
                         style = MaterialTheme.typography.bodySmall,
-                        color = if (floatingBallEnabled) Color(0xFF4CAF50) else Color(0xFF888888)
+                        color = Color(0xFF888888)
                     )
                 }
                 Switch(
                     checked = floatingBallEnabled,
                     onCheckedChange = { enabled ->
                         if (enabled) {
-                            if (Settings.canDrawOverlays(context)) {
-                                vm.setFloatingBallEnabled(true)
-                            } else {
-                                context.startActivity(
-                                    Intent(
-                                        Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                                        Uri.parse("package:$context.packageName")
-                                    )
+                            if (!Settings.canDrawOverlays(context)) {
+                                val intent = Intent(
+                                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                    Uri.parse("package:${context.packageName}")
                                 )
+                                context.startActivity(intent)
+                                return@Switch
                             }
+                            vm.setFloatingBallEnabled(true)
+                            com.pickuphelper.service.FloatingWindowService.start(context)
                         } else {
                             vm.setFloatingBallEnabled(false)
+                            com.pickuphelper.service.FloatingWindowService.stop(context)
                         }
                     }
                 )
             }
         }
 
-        // ── Data Source Mode ────────────────────────────────────────────────
+        // ── Data Source Mode ──────────────────────────────────────────────
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -147,12 +153,7 @@ fun SettingsScreen(vm: MainViewModel) {
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
-                Text(
-                    text = "切换查询来源（Mock 仅供测试，真实接入需配置后端）",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color(0xFF888888),
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
+                Spacer(modifier = Modifier.height(8.dp))
 
                 ProviderOption(
                     label = "模拟模式 (Mock)",
@@ -196,7 +197,8 @@ fun SettingsScreen(vm: MainViewModel) {
                         label = { Text("后端服务地址") },
                         placeholder = { Text("http://<服务器IP>:8080") },
                         modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
+                        singleLine = true,
+                        interactionSource = backendUrlInteraction
                     )
 
                     Spacer(modifier = Modifier.height(8.dp))
@@ -208,7 +210,8 @@ fun SettingsScreen(vm: MainViewModel) {
                         label = { Text("收件人手机号 *") },
                         placeholder = { Text("用于查询取件码（必填）") },
                         modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
+                        singleLine = true,
+                        interactionSource = receiverPhoneInteraction
                     )
 
                     Spacer(modifier = Modifier.height(12.dp))
@@ -248,8 +251,7 @@ fun SettingsScreen(vm: MainViewModel) {
                         onValueChange = { ebusinessId = it },
                         label = { Text("EBusinessID") },
                         modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        visualTransformation = PasswordVisualTransformation()
+                        singleLine = true
                     )
 
                     Spacer(modifier = Modifier.height(8.dp))
@@ -262,24 +264,6 @@ fun SettingsScreen(vm: MainViewModel) {
                         singleLine = true,
                         visualTransformation = PasswordVisualTransformation()
                     )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Button(
-                            onClick = {
-                                vm.saveEBusinessId(ebusinessId)
-                                vm.saveAppKey(appKey)
-                                saveMessage = "旧版参数已保存"
-                            },
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text("保存旧版参数")
-                        }
-                    }
                 }
             }
         }
@@ -292,14 +276,12 @@ fun SettingsScreen(vm: MainViewModel) {
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { privacyExpanded = !privacyExpanded },
+                    modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "隐私政策与数据说明",
+                        text = "隐私政策",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
@@ -308,6 +290,13 @@ fun SettingsScreen(vm: MainViewModel) {
                         contentDescription = null
                     )
                 }
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "点击查看隐私政策详情",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color(0xFF888888),
+                    modifier = Modifier.clickable { privacyExpanded = !privacyExpanded }
+                )
                 AnimatedVisibility(visible = privacyExpanded) {
                     Column(modifier = Modifier.padding(top = 12.dp)) {
                         Text(
