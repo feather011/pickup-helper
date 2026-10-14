@@ -72,4 +72,84 @@ class ShipperCodeMapperTest {
         assertTrue(codes.any { it.first == "YTO" })
         assertTrue(codes.any { it.first == "SF" })
     }
+
+    // ---- fromChineseName: reverse mapping for dropdown fallback ----
+
+    @Test
+    fun fromChineseNameZTO() {
+        assertEquals("ZTO", ShipperCodeMapper.fromChineseName("中通快递"))
+    }
+
+    @Test
+    fun fromChineseNameYunda() {
+        assertEquals("Yunda", ShipperCodeMapper.fromChineseName("韵达快递"))
+    }
+
+    @Test
+    fun fromChineseNameSTO() {
+        assertEquals("STO", ShipperCodeMapper.fromChineseName("申通快递"))
+    }
+
+    @Test
+    fun fromChineseNameYTO() {
+        assertEquals("YTO", ShipperCodeMapper.fromChineseName("圆通速递"))
+    }
+
+    @Test
+    fun fromChineseNameSF() {
+        assertEquals("SF", ShipperCodeMapper.fromChineseName("顺丰速运"))
+    }
+
+    @Test
+    fun fromChineseNameEMS() {
+        assertEquals("EMS", ShipperCodeMapper.fromChineseName("中国邮政EMS"))
+    }
+
+    @Test
+    fun fromChineseNameJT() {
+        assertEquals("JT", ShipperCodeMapper.fromChineseName("极兔速递"))
+    }
+
+    @Test
+    fun fromChineseNameUnknownReturnsNull() {
+        assertNull(ShipperCodeMapper.fromChineseName("菜鸟驿站"))
+    }
+
+    @Test
+    fun fromChineseNameNullReturnsNull() {
+        assertNull(ShipperCodeMapper.fromChineseName(null))
+    }
+
+    @Test
+    fun fromChineseNameEmptyReturnsNull() {
+        assertNull(ShipperCodeMapper.fromChineseName(""))
+    }
+
+    @Test
+    fun fromChineseNameTrimsWhitespace() {
+        assertEquals("ZTO", ShipperCodeMapper.fromChineseName("  中通快递  "))
+    }
+
+    // ---- end-to-end: pure numeric waybill + dropdown choice ----
+
+    @Test
+    fun pureNumericPlusDropdownFallback_zhongtong() {
+        val waybill = "1234567890"   // 纯数字，前缀推断必返回 null
+        val detected = ShipperCodeMapper.detect(waybill)
+        assertNull(detected)  // 确认前缀推断为 null
+        val userPicked = ShipperCodeMapper.fromChineseName("中通快递")
+        assertEquals("ZTO", userPicked)
+    }
+
+    @Test
+    fun pureNumericPlusDropdownFallback_yunda() {
+        val userPicked = ShipperCodeMapper.fromChineseName("韵达快递")
+        assertEquals("Yunda", userPicked)
+    }
+
+    @Test
+    fun pureNumericPlusDropdownFallback_shentong() {
+        val userPicked = ShipperCodeMapper.fromChineseName("申通快递")
+        assertEquals("STO", userPicked)
+    }
 }
