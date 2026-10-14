@@ -40,7 +40,7 @@ _*.ps1
 # Backend
 backend-node/.env
 backend-node/node_modules/
-backend-node/\u542f\u52a8\u540e\u7aef.bat
+backend-node/启动后端.bat
 backend-node/start-server.bat
 
 # Backend
