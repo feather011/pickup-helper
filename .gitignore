@@ -28,6 +28,7 @@ local.properties
 # OS
 .DS_Store
 Thumbs.db
+
 # 验收截图（本地证据，不入库）
 *.png
 screen_*.png
@@ -35,12 +36,16 @@ acc_*.png
 _*.xml
 _*.py
 _*.ps1
-backend-node/.env
-backend-node/node_modules/
 
 # Backend
 backend-node/.env
 backend-node/node_modules/
-backend-node/启动后端.bat
+backend-node/\u542f\u52a8\u540e\u7aef.bat
 backend-node/start-server.bat
 
+# Backend
+backend/.gradle/
+backend/build/
+
+# 验收截图白名单（work-package/test-screens/ 下的测试结果图需要保留）
+!work-package/test-screens/*.png
